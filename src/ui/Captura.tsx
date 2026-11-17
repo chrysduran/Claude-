@@ -10,6 +10,8 @@ type Borrador = Omit<Incumplimiento, "id" | "creado" | "actualizado"> & { id?: s
 export function Captura({ p, dia }: { p: Proyecto; dia: string }) {
   const db = useDatos();
   const [borrador, setBorrador] = useState<Borrador | null>(null);
+  const [original, setOriginal] = useState("");
+  const abrir = (b: Borrador) => { setBorrador(b); setOriginal(JSON.stringify(b)); };
   const [error, setError] = useState("");
   const nombreDia = DIAS[diasDeSemana(lunesDe(dia)).indexOf(dia)];
 
@@ -27,7 +29,7 @@ export function Captura({ p, dia }: { p: Proyecto; dia: string }) {
 
   const nuevo = (c: string) => {
     setError("");
-    setBorrador({ proyectoId: p.id, fecha: dia, contratista: c, actividad: "", zona: "", causa: "", notas: "", contramedida: "", responsable: "", fechaCompromiso: "", fotoId: "" });
+    abrir({ proyectoId: p.id, fecha: dia, contratista: c, actividad: "", zona: "", causa: "", notas: "", contramedida: "", responsable: "", fechaCompromiso: "", fotoId: "" });
   };
 
   const guardar = () => {
@@ -97,7 +99,7 @@ export function Captura({ p, dia }: { p: Proyecto; dia: string }) {
               {list.length > 0 && (
                 <div className="incs">
                   {list.map((i) => (
-                    <button type="button" key={i.id} className="inc" onClick={() => { setError(""); setBorrador({ ...i }); }}>
+                    <button type="button" key={i.id} className="inc" onClick={() => { setError(""); abrir({ ...i }); }}>
                       <span className="code">{i.causa}</span>
                       <span className="inc-body">
                         <b>{i.actividad}</b>
@@ -113,11 +115,11 @@ export function Captura({ p, dia }: { p: Proyecto; dia: string }) {
         })}
       </ul>
       {borrador && (
-        <Hoja titulo={borrador.id ? "Incumplimiento" : `No se cumplió · ${borrador.contratista}`} onCerrar={() => setBorrador(null)} accion="Guardar" onAccion={guardar}>
+        <Hoja titulo={borrador.id ? "Incumplimiento" : `No se cumplió · ${borrador.contratista}`} onCerrar={() => setBorrador(null)} accion="Guardar" onAccion={guardar} sucio={JSON.stringify(borrador) !== original}>
                 <div className="form">
                   <label className="field">
                     <span>Actividad no cumplida</span>
-                    <input type="text" value={borrador.actividad} placeholder="Ej. Piso cerámico depto 1204" onChange={(e) => setBorrador({ ...borrador, actividad: e.target.value })} />
+                    <input type="text" enterKeyHint="next" autoCapitalize="sentences" maxLength={500} value={borrador.actividad} placeholder="Ej. Piso cerámico depto 1204" onChange={(e) => setBorrador({ ...borrador, actividad: e.target.value })} />
                   </label>
                   <label className="field">
                     <span>Zona</span>
@@ -138,7 +140,7 @@ export function Captura({ p, dia }: { p: Proyecto; dia: string }) {
                   </div>
                   <label className="field">
                     <span>Qué pasó</span>
-                    <textarea value={borrador.notas} onChange={(e) => setBorrador({ ...borrador, notas: e.target.value })} />
+                    <textarea maxLength={4000} value={borrador.notas} onChange={(e) => setBorrador({ ...borrador, notas: e.target.value })} />
                   </label>
                   <label className="field">
                     <span>Contramedida</span>

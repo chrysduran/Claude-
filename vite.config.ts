@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
       workbox: {
         // La librería de Excel (~940 KB) no se descarga al instalar: se baja la primera vez que se exporta y queda guardada.
         globIgnores: ["**/exceljs*.js"],
@@ -19,8 +19,11 @@ export default defineConfig({
         short_name: "Pulso Obra",
         description: "Captura de PPC, incumplimientos, restricciones y planeación semanal del Last Planner System desde el celular.",
         lang: "es-MX",
-        theme_color: "#16505A",
-        background_color: "#F4F6F6",
+        id: "/",
+        theme_color: "#f2f2f7",
+        background_color: "#f2f2f7",
+        orientation: "portrait",
+        categories: ["business", "productivity"],
         display: "standalone",
         start_url: "/",
         icons: [

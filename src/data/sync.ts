@@ -16,8 +16,12 @@ export const coleccionDe = (tabla: string) => COLECCIONES.find((c) => TABLAS[c] 
 const aSnake = (k: string) => k.replace(/[A-Z]/g, (m) => "_" + m.toLowerCase());
 const aCamel = (k: string) => k.replace(/_([a-z])/g, (_, m: string) => m.toUpperCase());
 
+const LARGOS = new Set(["notas", "detalle", "observaciones"]);
+/** La nube limita el tamaño de los textos; aquí se recortan para que una fila nunca sea rechazada por eso. */
+const recortar = (k: string, v: unknown) => (typeof v === "string" && k !== "id" ? v.slice(0, LARGOS.has(k) ? 4000 : k === "nombre" ? 200 : 500) : v);
+
 export function aFila(obj: object): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined).map(([k, v]) => [aSnake(k), v]));
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined).map(([k, v]) => [aSnake(k), recortar(k, v)]));
 }
 
 export function deFila<T>(fila: Record<string, unknown>): T {
@@ -61,7 +65,13 @@ export function compactar(ops: Operacion[]): Operacion[] {
   }
   const res = [...ultima.values()];
   const pos = (o: Operacion) => (o.tipo === "upsert" ? (o.tabla === "proyectos" ? 0 : 1) : o.tabla === "proyectos" ? 3 : 2);
-  return res.sort((a, b) => pos(a) - pos(b));
+  return res.sort((a, b) => pos(a) - pos(b) || a.tabla.localeCompare(b.tabla));
+}
+
+/** Primer grupo de operaciones seguidas de la misma tabla y tipo, para mandarlas en una sola petición. */
+export function primerLote(ops: Operacion[], max = 200): Operacion[] {
+  const n = ops.findIndex((o, i) => i >= max || o.tabla !== ops[0].tabla || o.tipo !== ops[0].tipo);
+  return n < 0 ? ops : ops.slice(0, n);
 }
 
 /** ¿El error es definitivo (permiso o dato inválido) o temporal (sin conexión)? */

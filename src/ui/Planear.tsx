@@ -131,7 +131,7 @@ export function Planear({ p, lunes, onRestriccion }: { p: Proyecto; lunes: strin
         </>
       )}
       {nueva && (
-        <Hoja titulo="Nueva actividad" onCerrar={() => setNueva(null)} accion="Agregar" onAccion={() => {
+        <Hoja titulo="Nueva actividad" onCerrar={() => setNueva(null)} sucio={!!(nueva.unidad || nueva.actividad)} accion="Agregar" onAccion={() => {
                 if (!nueva.actividad.trim()) return toast("Escribe la actividad.");
                 actualizar((d) => { d.plan.push({ id: uid(), proyectoId: p.id, semana, grupo: nueva.grupo.trim() || "General", unidad: nueva.unidad.trim(), actividad: nueva.actividad.trim(), especialidad: nueva.especialidad.trim(), retrasada: false, decision: null, motivo: "", actualizado: Date.now() }); });
                 setNueva(null);

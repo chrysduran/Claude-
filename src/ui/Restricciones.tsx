@@ -11,6 +11,8 @@ export function Restricciones({ p, lunes, prefill, onPrefillUsado }: { p: Proyec
   const db = useDatos();
   const [filtro, setFiltro] = useState<Filtro>("abiertas");
   const [edit, setEdit] = useState<Restriccion | null>(null);
+  const [original, setOriginal] = useState("");
+  useEffect(() => { if (edit && !original) setOriginal(JSON.stringify(edit)); if (!edit) setOriginal(""); }, [edit, original]);
   const hoyS = hoy();
   const todas = db.restricciones.filter((r) => r.proyectoId === p.id).sort((a, b) => a.numero - b.numero);
 
@@ -94,7 +96,7 @@ export function Restricciones({ p, lunes, prefill, onPrefillUsado }: { p: Proyec
         );
       }) : <Vacio titulo="Nada en este filtro">Cambia de filtro o agrega una restricción.</Vacio>}
       {edit && (
-        <Hoja titulo={edit.id ? `Restricción #${edit.numero}` : "Nueva restricción"} onCerrar={() => setEdit(null)} accion="Guardar" onAccion={() => guardar(edit)}>
+        <Hoja titulo={edit.id ? `Restricción #${edit.numero}` : "Nueva restricción"} onCerrar={() => setEdit(null)} accion="Guardar" onAccion={() => guardar(edit)} sucio={!!original && JSON.stringify(edit) !== original}>
           {formulario(edit)}
         </Hoja>
       )}

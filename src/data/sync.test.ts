@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aFila, compactar, deFila, diferencias, esErrorDefinitivo } from "./sync";
+import { aFila, compactar, deFila, diferencias, esErrorDefinitivo, primerLote, type Operacion } from "./sync";
 import type { BaseDatos } from "../types";
 
 const base = (): BaseDatos => ({ version: 1, proyectos: [], conteos: [], incumplimientos: [], restricciones: [], plan: [], narracion: [] });
@@ -47,5 +47,25 @@ describe("diferencias", () => {
     expect(esErrorDefinitivo({ status: 403 })).toBe(true);
     expect(esErrorDefinitivo({ message: "Failed to fetch" })).toBe(false);
     expect(esErrorDefinitivo({ status: 503 })).toBe(false);
+  });
+});
+
+describe("envío por lotes", () => {
+  const op = (tabla: string, tipo: "upsert" | "delete", id: string): Operacion => ({ tabla, tipo, id, fila: tipo === "upsert" ? { id } : undefined });
+  it("agrupa operaciones seguidas de la misma tabla y tipo, con tope", () => {
+    const ops = [op("conteos", "upsert", "a"), op("conteos", "upsert", "b"), op("incumplimientos", "upsert", "c")];
+    expect(primerLote(ops).map((o) => o.id)).toEqual(["a", "b"]);
+    expect(primerLote(ops, 1).map((o) => o.id)).toEqual(["a"]);
+    expect(primerLote([op("conteos", "delete", "x")]).length).toBe(1);
+  });
+  it("compactar deja juntas las filas de una misma tabla para mandarlas en una sola petición", () => {
+    const ops = compactar([op("incumplimientos", "upsert", "1"), op("conteos", "upsert", "2"), op("incumplimientos", "upsert", "3")]);
+    expect(ops.map((o) => o.tabla)).toEqual(["conteos", "incumplimientos", "incumplimientos"]);
+  });
+  it("recorta textos demasiado largos para que la nube no rechace la fila", () => {
+    const f = aFila({ id: "x".repeat(300), notas: "n".repeat(5000), actividad: "a".repeat(900) });
+    expect((f.id as string).length).toBe(300);
+    expect((f.notas as string).length).toBe(4000);
+    expect((f.actividad as string).length).toBe(500);
   });
 });
