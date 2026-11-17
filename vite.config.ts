@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icon.svg"],
+      includeAssets: ["icon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Pulso Obra",
         short_name: "Pulso Obra",
@@ -18,8 +18,10 @@ export default defineConfig({
         display: "standalone",
         start_url: "/",
         icons: [
-          { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-          { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
+          { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "icon.svg", sizes: "any", type: "image/svg+xml" },
         ],
       },
     }),

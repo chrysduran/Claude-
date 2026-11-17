@@ -12,10 +12,11 @@ App web instalable (PWA) para llevar el **Last Planner System** desde el celular
 - **Análisis:** tendencia de PPC, causas que se repiten varias semanas y matriz causa × contratista.
 - **Ajustes:** varios proyectos, catálogos configurables (contratistas, zonas, causas), meta de PPC, proyecto demo y respaldo.
 
-## Estado actual (fase 1)
-Los datos se guardan **en el dispositivo** (localStorage y, para las fotos, IndexedDB). Funciona sin cuentas ni servidores. Para pasar datos a otro teléfono se usa el respaldo en Ajustes.
+## Modos de uso
+- **Local (sin cuentas):** los datos se guardan en el teléfono (localStorage y, para las fotos, IndexedDB). Para pasar datos a otro teléfono se usa el respaldo en Ajustes.
+- **Nube (con Supabase):** inicio de sesión con código por correo, empresas, equipo con roles (administrador, supervisor, solo lectura), invitaciones con código, datos compartidos con cambios en vivo, fotos en la nube y cola sin conexión. Se activa al publicar con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (ver `.env.example`).
 
-**Fase 2:** usuarios, empresas y datos compartidos en la nube con Supabase. El esquema está listo en [`supabase/schema.sql`](supabase/schema.sql), con seguridad por filas para que cada empresa vea solo lo suyo.
+La guía para dejarla funcionando con tus cuentas está en [`docs/PUESTA_EN_MARCHA.md`](docs/PUESTA_EN_MARCHA.md). El esquema y las reglas de seguridad están en [`supabase/schema.sql`](supabase/schema.sql), con pruebas en `supabase/prueba-reglas.mjs`.
 
 ## Desarrollo
 ```bash

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Restriccion } from "./types";
-import { actualizar, alAlmacenamientoLleno, useDatos } from "./data/store";
+import { actualizar, alAlmacenamientoLleno, alBloqueo, useDatos } from "./data/store";
+import { abrirEmpresa, cerrarEmpresa, nubeActiva, sb, type Membresia } from "./data/nube";
+import { Acceso } from "./ui/Acceso";
 import { cargarDemo, proyectoNuevo } from "./data/demo";
 import { corta, DIAS, diasDeSemana, hoy, lunesDe, semanaIso, sumarDias } from "./lib/fechas";
 import { calcular } from "./lib/ppc";
@@ -30,19 +32,61 @@ const recordar = <T,>(k: string, v?: T): T | undefined => {
   return v;
 };
 
+export interface Nube {
+  m: Membresia;
+  email: string;
+  pendientes: number;
+  cambiarEmpresa: () => void;
+  salir: () => void;
+}
+
 export default function App() {
+  if (!nubeActiva) return <Principal nube={null} />;
+  return <Acceso>{(m, cambiar, salir) => <ConNube key={m.empresaId} m={m} cambiar={cambiar} salir={salir} />}</Acceso>;
+}
+
+function ConNube({ m, cambiar, salir }: { m: Membresia; cambiar: () => void; salir: () => void }) {
+  const [pendientes, setPendientes] = useState(0);
+  const [email, setEmail] = useState("");
+  const [lista, setLista] = useState(false);
+  useEffect(() => {
+    sb!.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ""));
+    void abrirEmpresa(m, { avisar: toast, pendientes: setPendientes }).finally(() => setLista(true));
+    return () => cerrarEmpresa();
+  }, [m.empresaId]);
+  if (!lista) return <main className="bienvenida in"><p>Abriendo {m.nombre}…</p></main>;
+  return <Principal nube={{ m, email, pendientes, cambiarEmpresa: cambiar, salir }} />;
+}
+
+function Principal({ nube }: { nube: Nube | null }) {
   const db = useDatos();
+  const admin = !nube || nube.m.rol === "admin";
   const [proyectoId, setProyectoId] = useState<string>(() => recordar<string>("lps:proyecto") ?? "");
   const [pestana, setPestana] = useState<Pestana>(() => recordar<Pestana>("lps:pestana") ?? "cap");
   const [dia, setDia] = useState(hoy());
   const [prefill, setPrefill] = useState<Partial<Restriccion> | null>(null);
   const lunes = lunesDe(dia);
 
-  useEffect(() => { alAlmacenamientoLleno(() => toast("El dispositivo no tiene espacio para guardar. Descarga un respaldo en Ajustes.")); }, []);
+  useEffect(() => {
+    alAlmacenamientoLleno(() => toast("El dispositivo no tiene espacio para guardar. Descarga un respaldo en Ajustes."));
+    alBloqueo(toast);
+  }, []);
   useEffect(() => { recordar("lps:proyecto", proyectoId); }, [proyectoId]);
   useEffect(() => { recordar("lps:pestana", pestana); }, [pestana]);
 
   const p = db.proyectos.find((x) => x.id === proyectoId) ?? db.proyectos[0] ?? null;
+
+  if (!p && !admin) {
+    return (
+      <main className="bienvenida in">
+        <h1>{nube!.m.nombre}</h1>
+        <p>Todavía no hay proyectos en esta empresa. Pídele al administrador que cree el primero.</p>
+        <button type="button" className="btn ghost" onClick={nube!.cambiarEmpresa}>Cambiar de empresa</button>
+        <button type="button" className="btn ghost" onClick={nube!.salir}>Cerrar sesión</button>
+        <Toast />
+      </main>
+    );
+  }
 
   if (!p) {
     return (
@@ -71,11 +115,12 @@ export default function App() {
       <header className="band">
         <div className="in">
           <div className="brandrow">
-            <div className="marca"><b>Pulso Obra</b>
+            <div className="marca"><b>{nube ? nube.m.nombre : "Pulso Obra"}</b>
               {db.proyectos.length > 1 ? (
                 <select aria-label="Proyecto" value={p.id} onChange={(e) => setProyectoId(e.target.value)}>{db.proyectos.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
               ) : <span>{p.nombre}</span>}
             </div>
+            {nube && nube.pendientes > 0 && <span className="pend" title="Se envían en cuanto haya conexión">{nube.pendientes} sin enviar</span>}
           </div>
           <div className="wkrow">
             <button type="button" className="nav" aria-label="Semana anterior" onClick={() => irSemana(-1)}>‹</button>
@@ -122,7 +167,7 @@ export default function App() {
           {pestana === "res" && <Restricciones p={p} lunes={lunes} prefill={prefill} onPrefillUsado={() => setPrefill(null)} />}
           {pestana === "sem" && <Semana p={p} lunes={lunes} dia={dia} />}
           {pestana === "ana" && <Analisis p={p} lunes={lunes} />}
-          {pestana === "aju" && <Ajustes p={p} onCambiarProyecto={setProyectoId} />}
+          {pestana === "aju" && <Ajustes p={p} onCambiarProyecto={setProyectoId} nube={nube} />}
         </section>
       </div>
       <Toast />

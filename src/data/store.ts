@@ -2,16 +2,18 @@ import { useSyncExternalStore } from "react";
 import type { BaseDatos } from "../types";
 
 /**
- * Almacenamiento local (en el dispositivo). La interfaz `actualizar` es la misma que usará
- * el adaptador de Supabase (ver supabase/schema.sql) cuando haya usuarios y datos compartidos.
+ * Estado de la app. Siempre se guarda una copia en el dispositivo (funciona sin conexión).
+ * En modo nube, cada cambio local se manda también a Supabase (ver nube.ts) y los cambios
+ * de otros teléfonos llegan con `aplicarRemoto`.
  */
-const CLAVE = "bitacora-lps:v1";
+export const CLAVE_LOCAL = "bitacora-lps:v1";
+let clave = CLAVE_LOCAL;
 
-const vacia = (): BaseDatos => ({ version: 1, proyectos: [], conteos: [], incumplimientos: [], restricciones: [], plan: [], narracion: [] });
+export const vacia = (): BaseDatos => ({ version: 1, proyectos: [], conteos: [], incumplimientos: [], restricciones: [], plan: [], narracion: [] });
 
-function leer(): BaseDatos {
+export function leerClave(k: string): BaseDatos {
   try {
-    const raw = localStorage.getItem(CLAVE);
+    const raw = localStorage.getItem(k);
     if (raw) return { ...vacia(), ...JSON.parse(raw) };
   } catch {
     /* almacenamiento bloqueado o dañado: se arranca vacío */
@@ -19,19 +21,54 @@ function leer(): BaseDatos {
   return vacia();
 }
 
-let estado: BaseDatos = typeof localStorage === "undefined" ? vacia() : leer();
+let estado: BaseDatos = typeof localStorage === "undefined" ? vacia() : leerClave(clave);
 const oyentes = new Set<() => void>();
 
-export function actualizar(fn: (db: BaseDatos) => BaseDatos | void) {
-  const copia = structuredClone(estado);
-  estado = (fn(copia) as BaseDatos | undefined) ?? copia;
+type Destino = (antes: BaseDatos, despues: BaseDatos) => void;
+let destino: Destino | null = null;
+let bloqueo: string | null = null;
+
+function guardar() {
   try {
-    localStorage.setItem(CLAVE, JSON.stringify(estado));
+    localStorage.setItem(clave, JSON.stringify(estado));
   } catch {
     alertaAlmacenamiento?.();
   }
   oyentes.forEach((o) => o());
 }
+
+export function actualizar(fn: (db: BaseDatos) => BaseDatos | void) {
+  if (bloqueo) return alertaBloqueo?.(bloqueo);
+  const antes = estado;
+  const copia = structuredClone(estado);
+  estado = (fn(copia) as BaseDatos | undefined) ?? copia;
+  guardar();
+  destino?.(antes, estado);
+}
+
+/** Cambios que vienen de la nube: se guardan y se muestran, pero no se vuelven a mandar. */
+export function aplicarRemoto(fn: (db: BaseDatos) => BaseDatos | void) {
+  const copia = structuredClone(estado);
+  estado = (fn(copia) as BaseDatos | undefined) ?? copia;
+  guardar();
+}
+
+/** Cambia de "cuaderno" (local o el de una empresa en la nube) y opcionalmente manda los cambios a `d`. */
+export function usarAlmacen(k: string, d: Destino | null) {
+  clave = k;
+  destino = d;
+  estado = leerClave(k);
+  oyentes.forEach((o) => o());
+}
+
+/** Solo lectura: bloquea los cambios con un mensaje. */
+export function soloLectura(mensaje: string | null) {
+  bloqueo = mensaje;
+}
+
+let alertaBloqueo: ((m: string) => void) | undefined;
+export const alBloqueo = (fn: (m: string) => void) => (alertaBloqueo = fn);
+export const estadoActual = () => estado;
 
 let alertaAlmacenamiento: (() => void) | undefined;
 export const alAlmacenamientoLleno = (fn: () => void) => (alertaAlmacenamiento = fn);
@@ -54,7 +91,14 @@ const abrir = () =>
     r.onerror = () => mal(r.error);
   });
 
-export async function guardarFoto(id: string, blob: Blob) {
+interface FotosRemotas {
+  subir: (id: string, blob: Blob) => Promise<void>;
+  bajar: (id: string) => Promise<Blob | undefined>;
+}
+let remotas: FotosRemotas | null = null;
+export const usarFotosRemotas = (r: FotosRemotas | null) => (remotas = r);
+
+async function guardarLocal(id: string, blob: Blob) {
   const db = await abrir();
   await new Promise<void>((ok, mal) => {
     const tx = db.transaction("fotos", "readwrite");
@@ -64,13 +108,23 @@ export async function guardarFoto(id: string, blob: Blob) {
   });
 }
 
+/** Guarda la foto en el teléfono y, en modo nube, la sube. */
+export async function guardarFoto(id: string, blob: Blob) {
+  await guardarLocal(id, blob);
+  if (remotas) await remotas.subir(id, blob);
+}
+
 export async function leerFoto(id: string): Promise<Blob | undefined> {
   const db = await abrir();
-  return new Promise((ok, mal) => {
+  const local = await new Promise<Blob | undefined>((ok, mal) => {
     const r = db.transaction("fotos").objectStore("fotos").get(id);
     r.onsuccess = () => ok(r.result as Blob | undefined);
     r.onerror = () => mal(r.error);
   });
+  if (local || !remotas) return local;
+  const b = await remotas.bajar(id).catch(() => undefined);
+  if (b) await guardarLocal(id, b).catch(() => {});
+  return b;
 }
 
 /** Reduce la foto a 1600 px por lado para ahorrar espacio. */

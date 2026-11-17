@@ -4,11 +4,14 @@ import { actualizar, useDatos } from "../data/store";
 import { cargarDemo, proyectoNuevo } from "../data/demo";
 import { hoy } from "../lib/fechas";
 import { BotonConfirmar, toast } from "./comun";
+import { Equipo } from "./Equipo";
+import type { Nube } from "../App";
 
 const lineas = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 
-export function Ajustes({ p, onCambiarProyecto }: { p: Proyecto | null; onCambiarProyecto: (id: string) => void }) {
+export function Ajustes({ p, onCambiarProyecto, nube }: { p: Proyecto | null; onCambiarProyecto: (id: string) => void; nube: Nube | null }) {
   const db = useDatos();
+  const admin = !nube || nube.m.rol === "admin";
   const [nombreNuevo, setNombreNuevo] = useState("");
 
   const editar = (cambio: Partial<Proyecto>) => p && actualizar((d) => { d.proyectos = d.proyectos.map((x) => (x.id === p.id ? { ...x, ...cambio } : x)); });
@@ -46,7 +49,15 @@ export function Ajustes({ p, onCambiarProyecto }: { p: Proyecto | null; onCambia
 
   return (
     <>
-      {p && (
+      {nube && <Equipo m={nube.m} usuarioEmail={nube.email} onCambiarEmpresa={nube.cambiarEmpresa} onSalir={nube.salir} />}
+      {!admin && p && (
+        <div className="panel">
+          <span className="lab">Proyecto actual</span>
+          <h2>{p.nombre}</h2>
+          <p className="hint">Meta de PPC: {p.meta} %. Solo un administrador puede cambiar los catálogos y la meta.</p>
+        </div>
+      )}
+      {admin && p && (
         <div className="panel">
           <span className="lab">Proyecto actual</span>
           <label className="field"><span>Nombre</span><input type="text" defaultValue={p.nombre} key={p.id + "n"} onBlur={(e) => e.target.value.trim() && editar({ nombre: e.target.value.trim() })} /></label>
@@ -68,19 +79,19 @@ export function Ajustes({ p, onCambiarProyecto }: { p: Proyecto | null; onCambia
           }}>Borrar este proyecto y sus datos</BotonConfirmar>
         </div>
       )}
-      <div className="panel">
+      {admin && <div className="panel">
         <span className="lab">Proyectos</span>
         <label className="field"><span>Nuevo proyecto</span>
           <div className="pl-nr"><input type="text" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} placeholder="Ej. Torre Norte" /><button type="button" className="mini" onClick={crear}>Crear</button></div>
         </label>
         <button type="button" className="btn ghost" onClick={() => { let id = ""; actualizar((d) => { id = cargarDemo(d, hoy()); }); onCambiarProyecto(id); toast("Proyecto demo cargado"); }}>Cargar proyecto demo</button>
-      </div>
+      </div>}
       <div className="panel">
         <span className="lab">Respaldo</span>
-        <p className="hint">Por ahora los datos viven solo en este dispositivo. Descarga un respaldo con frecuencia; con él puedes pasar la información a otro teléfono.</p>
+        <p className="hint">{nube ? "Tus datos se guardan en la nube de la empresa y una copia en este teléfono. El respaldo es un archivo extra por si lo necesitas." : "Por ahora los datos viven solo en este dispositivo. Descarga un respaldo con frecuencia; con él puedes pasar la información a otro teléfono."}</p>
         <div className="actions">
           <button type="button" className="btn ghost grow" onClick={respaldo}>Descargar respaldo</button>
-          <label className="btn ghost grow">Restaurar respaldo<input type="file" accept="application/json,.json" hidden onChange={(e) => { restaurar(e.target.files?.[0]); e.target.value = ""; }} /></label>
+          {!nube && <label className="btn ghost grow">Restaurar respaldo<input type="file" accept="application/json,.json" hidden onChange={(e) => { restaurar(e.target.files?.[0]); e.target.value = ""; }} /></label>}
         </div>
       </div>
     </>
