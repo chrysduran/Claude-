@@ -155,6 +155,10 @@ function escuchar(empresaId: string) {
       const id = (nueva?.id ?? (cambio.old as { id?: string }).id) as string;
       // Si este teléfono tiene un cambio sin enviar para esa fila, gana el local.
       if (leerPendientes().some((o) => o.tabla === tabla && o.id === id)) return;
+      // Si la copia del teléfono es más reciente que la que llega, se conserva (última escritura gana).
+      const local = (estadoActual()[c] as { id: string; actualizado?: number }[]).find((x) => x.id === id);
+      const llega = nueva as { actualizado?: number } | null;
+      if (local && llega && (local.actualizado ?? 0) > (llega.actualizado ?? 0)) return;
       aplicarRemoto((d) => {
         const lista = (d[c] as { id: string }[]).filter((x) => x.id !== id);
         if (nueva) lista.push(nueva);
