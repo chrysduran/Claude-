@@ -3,7 +3,7 @@ import type { ActividadPlan, Decision, Proyecto, Restriccion } from "../types";
 import { actualizar, uid, useDatos } from "../data/store";
 import { claveSemana, corta, sumarDias } from "../lib/fechas";
 import { leerCsv } from "../lib/csv";
-import { toast, Vacio } from "./comun";
+import { Hoja, toast, Vacio } from "./comun";
 
 const siguiente = (d: Decision): Decision => (d === null ? "si" : d === "si" ? "no" : null);
 const ordenGrupo = (g: string) => {
@@ -64,30 +64,12 @@ export function Planear({ p, lunes, onRestriccion }: { p: Proyecto; lunes: strin
             <div className="tk-legend num"><span><i className="sw ok" />✓ Se planea {si}</span><span><i className="sw no" />✗ No se planea {no}</span><span><i className="sw" />Sin decidir {todas.length - si - no}</span></div>
           </>
         )}
-        <p className="hint">Toca una actividad: una vez ✓ se planea, dos veces ✗ no se planea, tres veces vuelve a sin decidir. Importa la lista desde tu programa maestro en CSV (columnas: grupo, unidad, actividad, especialidad, retrasada) o agrégalas a mano.</p>
+        <p className="hint">Toca una actividad: ✓ se planea · ✗ no se planea · otra vez, sin decidir.</p>
         <div className="actions">
           <label className="btn ghost grow">Importar CSV<input type="file" accept=".csv,text/csv" hidden onChange={(e) => { importar(e.target.files?.[0]); e.target.value = ""; }} /></label>
-          <button type="button" className="btn ghost grow" onClick={() => setNueva({ grupo: "", unidad: "", actividad: "", especialidad: "" })}>+ Agregar actividad</button>
+          <button type="button" className="btn ghost grow" onClick={() => setNueva({ grupo: "", unidad: "", actividad: "", especialidad: "" })}>Agregar</button>
         </div>
-        {nueva && (
-          <div className="form flat">
-            <div className="row2">
-              <label className="field"><span>Grupo (nivel o frente)</span><input type="text" value={nueva.grupo} onChange={(e) => setNueva({ ...nueva, grupo: e.target.value })} placeholder="Nivel 8" /></label>
-              <label className="field"><span>Unidad</span><input type="text" value={nueva.unidad} onChange={(e) => setNueva({ ...nueva, unidad: e.target.value })} placeholder="802" /></label>
-            </div>
-            <label className="field"><span>Actividad</span><input type="text" value={nueva.actividad} onChange={(e) => setNueva({ ...nueva, actividad: e.target.value })} /></label>
-            <label className="field"><span>Especialidad</span><input type="text" list="dl-esp" value={nueva.especialidad} onChange={(e) => setNueva({ ...nueva, especialidad: e.target.value })} /></label>
-            <datalist id="dl-esp">{p.contratistas.map((c) => <option key={c} value={c} />)}</datalist>
-            <div className="actions">
-              <button type="button" className="btn ghost" onClick={() => setNueva(null)}>Cancelar</button>
-              <button type="button" className="btn grow" onClick={() => {
-                if (!nueva.actividad.trim()) return toast("Escribe la actividad.");
-                actualizar((d) => { d.plan.push({ id: uid(), proyectoId: p.id, semana, grupo: nueva.grupo.trim() || "General", unidad: nueva.unidad.trim(), actividad: nueva.actividad.trim(), especialidad: nueva.especialidad.trim(), retrasada: false, decision: null, motivo: "", actualizado: Date.now() }); });
-                setNueva(null);
-              }}>Agregar</button>
-            </div>
-          </div>
-        )}
+        <p className="hint">CSV con columnas: grupo, unidad, actividad, especialidad, retrasada.</p>
       </div>
 
       {!todas.length ? (
@@ -147,6 +129,23 @@ export function Planear({ p, lunes, onRestriccion }: { p: Proyecto; lunes: strin
             )) : <p className="hint">Las actividades que marques con ✗ aparecen aquí para anotar por qué no entran al plan.</p>}
           </div>
         </>
+      )}
+      {nueva && (
+        <Hoja titulo="Nueva actividad" onCerrar={() => setNueva(null)} accion="Agregar" onAccion={() => {
+                if (!nueva.actividad.trim()) return toast("Escribe la actividad.");
+                actualizar((d) => { d.plan.push({ id: uid(), proyectoId: p.id, semana, grupo: nueva.grupo.trim() || "General", unidad: nueva.unidad.trim(), actividad: nueva.actividad.trim(), especialidad: nueva.especialidad.trim(), retrasada: false, decision: null, motivo: "", actualizado: Date.now() }); });
+                setNueva(null);
+              }}>
+          <div className="form flat">
+            <div className="row2">
+              <label className="field"><span>Grupo (nivel o frente)</span><input type="text" value={nueva.grupo} onChange={(e) => setNueva({ ...nueva, grupo: e.target.value })} placeholder="Nivel 8" /></label>
+              <label className="field"><span>Unidad</span><input type="text" value={nueva.unidad} onChange={(e) => setNueva({ ...nueva, unidad: e.target.value })} placeholder="802" /></label>
+            </div>
+            <label className="field"><span>Actividad</span><input type="text" value={nueva.actividad} onChange={(e) => setNueva({ ...nueva, actividad: e.target.value })} /></label>
+            <label className="field"><span>Especialidad</span><input type="text" list="dl-esp" value={nueva.especialidad} onChange={(e) => setNueva({ ...nueva, especialidad: e.target.value })} /></label>
+            <datalist id="dl-esp">{p.contratistas.map((c) => <option key={c} value={c} />)}</datalist>
+          </div>
+        </Hoja>
       )}
     </>
   );

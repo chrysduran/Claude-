@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { EstadoRestriccion, Proyecto, Restriccion } from "../types";
 import { actualizar, uid, useDatos } from "../data/store";
-import { diasEntre, dmy, hoy, sumarDias } from "../lib/fechas";
-import { BotonConfirmar, toast, Vacio } from "./comun";
+import { corta, diasEntre, hoy, sumarDias } from "../lib/fechas";
+import { BotonConfirmar, Hoja, Icono, toast, Vacio } from "./comun";
 
 const ESTADOS: EstadoRestriccion[] = ["Abierta", "En proceso", "Liberada"];
 type Filtro = "abiertas" | "semana" | "vencidas" | "liberadas" | "todas";
@@ -64,9 +64,7 @@ export function Restricciones({ p, lunes, prefill, onPrefillUsado }: { p: Proyec
       <label className="field"><span>Observaciones</span><textarea value={r.observaciones} onChange={(e) => setEdit({ ...r, observaciones: e.target.value })} /></label>
       <div className="actions">
         {r.id && <BotonConfirmar onConfirm={() => { actualizar((d) => { d.restricciones = d.restricciones.filter((x) => x.id !== r.id); }); setEdit(null); }}>Borrar</BotonConfirmar>}
-        <button type="button" className="btn ghost" onClick={() => setEdit(null)}>Cancelar</button>
         {r.id && r.estado !== "Liberada" && <button type="button" className="btn ghost" onClick={() => guardar({ ...r, estado: "Liberada", fechaCierre: hoyS })}>Liberar hoy</button>}
-        <button type="button" className="btn grow" onClick={() => guardar(r)}>Guardar</button>
       </div>
     </div>
   );
@@ -78,28 +76,28 @@ export function Restricciones({ p, lunes, prefill, onPrefillUsado }: { p: Proyec
           <button type="button" key={k} className="chip" aria-pressed={filtro === k} onClick={() => setFiltro(k)}>{t} {todas.filter(F[k]).length}</button>
         ))}
       </div>
-      {edit && !edit.id ? (
-        <div className="rs"><div className="rs-h"><span className="rs-n">#{edit.numero}</span><span className="rs-m"><b>Nueva restricción</b></span></div>{formulario(edit)}</div>
-      ) : (
-        <button type="button" className="addinc" onClick={() => setEdit(nueva())}>+ Nueva restricción</button>
-      )}
+      <button type="button" className="addinc" onClick={() => setEdit(nueva())}><Icono n="mas" tam={18} /> Nueva restricción</button>
       {lista.length ? lista.map((r) => {
         const [t, c] = pill(r);
         return (
           <div className="rs" key={r.id}>
-            <button type="button" className="rs-h" onClick={() => setEdit(edit?.id === r.id ? null : r)}>
+            <button type="button" className="rs-h" onClick={() => setEdit(r)}>
               <span className="rs-n num">#{r.numero}</span>
               <span className="rs-m">
                 <b>{r.asunto}</b>
                 <small>{[r.zona, r.contratista, r.responsable].filter(Boolean).join(" · ")}</small>
-                <small>Compromiso {dmy(r.fechaCompromiso) || "sin fecha"} · {diasEntre(r.fechaIdentificada, r.fechaCierre || hoyS)} días desde que se identificó</small>
+                <small>Compromiso {r.fechaCompromiso ? corta(r.fechaCompromiso) : "sin fecha"} · {diasEntre(r.fechaIdentificada, r.fechaCierre || hoyS)} días abierta</small>
               </span>
               <span className={`pill ${c}`}>{t}</span>
             </button>
-            {edit?.id === r.id && formulario(edit)}
           </div>
         );
       }) : <Vacio titulo="Nada en este filtro">Cambia de filtro o agrega una restricción.</Vacio>}
+      {edit && (
+        <Hoja titulo={edit.id ? `Restricción #${edit.numero}` : "Nueva restricción"} onCerrar={() => setEdit(null)} accion="Guardar" onAccion={() => guardar(edit)}>
+          {formulario(edit)}
+        </Hoja>
+      )}
     </>
   );
 }

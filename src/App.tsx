@@ -5,8 +5,8 @@ import { abrirEmpresa, cerrarEmpresa, nubeActiva, sb, type Membresia } from "./d
 import { Acceso } from "./ui/Acceso";
 import { cargarDemo, proyectoNuevo } from "./data/demo";
 import { corta, DIAS, diasDeSemana, hoy, lunesDe, semanaIso, sumarDias } from "./lib/fechas";
-import { calcular } from "./lib/ppc";
-import { Medidor, Ppc, toast, Toast } from "./ui/comun";
+import { calcular, formato, nivel } from "./lib/ppc";
+import { Anillo, Icono, Segmentado, toast, Toast } from "./ui/comun";
 import { Captura } from "./ui/Captura";
 import { Planear } from "./ui/Planear";
 import { Restricciones } from "./ui/Restricciones";
@@ -15,14 +15,14 @@ import { Analisis } from "./ui/Analisis";
 import { Ajustes } from "./ui/Ajustes";
 
 const PESTANAS = [
-  ["cap", "Captura"],
-  ["pla", "Planear"],
-  ["res", "Restricciones"],
-  ["sem", "Semana"],
-  ["ana", "Análisis"],
-  ["aju", "Ajustes"],
+  ["cap", "Hoy", "hoy"],
+  ["pla", "Planear", "planear"],
+  ["res", "Restricciones", "restric"],
+  ["rep", "Reporte", "reporte"],
+  ["aju", "Ajustes", "ajustes"],
 ] as const;
 type Pestana = (typeof PESTANAS)[number][0];
+const TITULOS: Record<Pestana, string> = { cap: "Hoy", pla: "Planear", res: "Restricciones", rep: "Reporte", aju: "Ajustes" };
 
 const recordar = <T,>(k: string, v?: T): T | undefined => {
   try {
@@ -62,7 +62,11 @@ function Principal({ nube }: { nube: Nube | null }) {
   const db = useDatos();
   const admin = !nube || nube.m.rol === "admin";
   const [proyectoId, setProyectoId] = useState<string>(() => recordar<string>("lps:proyecto") ?? "");
-  const [pestana, setPestana] = useState<Pestana>(() => recordar<Pestana>("lps:pestana") ?? "cap");
+  const [pestana, setPestana] = useState<Pestana>(() => {
+    const g = recordar<string>("lps:pestana");
+    return PESTANAS.some(([k]) => k === g) ? (g as Pestana) : "cap";
+  });
+  const [vistaRep, setVistaRep] = useState<"sem" | "ana">("sem");
   const [dia, setDia] = useState(hoy());
   const [prefill, setPrefill] = useState<Partial<Restriccion> | null>(null);
   const lunes = lunesDe(dia);
@@ -107,70 +111,80 @@ function Principal({ nube }: { nube: Nube | null }) {
   const incs = db.incumplimientos.filter((i) => i.proyectoId === p.id);
   const rDia = calcular(conteos, incs, [dia], p.contratistas);
   const rSem = calcular(conteos, incs, dias, p.contratistas);
-  const muestraDia = pestana === "cap" || pestana === "sem";
+  const conDias = pestana === "cap" || pestana === "rep";
   const irSemana = (n: number) => setDia(sumarDias(lunes, 7 * n));
+  const nombreDia = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][dias.indexOf(dia)];
+  const titulo = pestana === "cap" ? (dia === hoy() ? "Hoy" : nombreDia) : TITULOS[pestana];
 
   return (
-    <>
-      <header className="band">
-        <div className="in">
-          <div className="brandrow">
-            <div className="marca"><b>{nube ? nube.m.nombre : "Pulso Obra"}</b>
-              {db.proyectos.length > 1 ? (
-                <select aria-label="Proyecto" value={p.id} onChange={(e) => setProyectoId(e.target.value)}>{db.proyectos.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
-              ) : <span>{p.nombre}</span>}
-            </div>
-            {nube && nube.pendientes > 0 && <span className="pend" title="Se envían en cuanto haya conexión">{nube.pendientes} sin enviar</span>}
+    <div className="app">
+      <header className="barra">
+        <div className="barra-fila">
+          <div className="contexto">
+            <span className="contexto-emp">{nube ? nube.m.nombre : "Pulso Obra"}</span>
+            {db.proyectos.length > 1 ? (
+              <select aria-label="Proyecto" value={p.id} onChange={(e) => setProyectoId(e.target.value)}>{db.proyectos.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
+            ) : <span className="contexto-proy">{p.nombre}</span>}
           </div>
-          <div className="wkrow">
-            <button type="button" className="nav" aria-label="Semana anterior" onClick={() => irSemana(-1)}>‹</button>
-            <div className="wk"><b className="num">Semana {semanaIso(lunes).semana}</b><span className="num">{corta(lunes)} – {corta(sumarDias(lunes, 5))} {lunes.slice(0, 4)}</span></div>
-            <button type="button" className="nav" aria-label="Semana siguiente" onClick={() => irSemana(1)}>›</button>
-          </div>
-          <div className="days" role="group" aria-label="Día de la semana">
-            {dias.map((d, i) => (
-              <button type="button" key={d} aria-pressed={d === dia} className={d === hoy() ? "today" : ""} onClick={() => setDia(d)}>
-                <small>{DIAS[i]}</small><b className="num">{Number(d.slice(8))}</b>
-              </button>
-            ))}
+          {nube && nube.pendientes > 0 && <span className="pend" title="Se envían en cuanto haya conexión"><Icono n="nube" tam={14} /> {nube.pendientes} sin enviar</span>}
+          <div className="semana">
+            <button type="button" aria-label="Semana anterior" onClick={() => irSemana(-1)}><Icono n="izq" tam={18} /></button>
+            <span className="num">S{semanaIso(lunes).semana}</span>
+            <button type="button" aria-label="Semana siguiente" onClick={() => irSemana(1)}><Icono n="der" tam={18} /></button>
           </div>
         </div>
       </header>
 
-      <div className="in">
-        {muestraDia && (
-          <section className="ppc" aria-label="PPC">
-            <div className="kpi">
-              <span className="lab">PPC {DIAS[dias.indexOf(dia)]} {corta(dia)}</span>
-              <Ppc ppc={rDia.ppc} meta={p.meta} className="big" />
-              <Medidor ppc={rDia.ppc} meta={p.meta} />
-              <span className="det num">{rDia.planeadas ? `${rDia.cumplidas} de ${rDia.planeadas} cumplidas` : "Sin actividades planeadas"}</span>
-            </div>
-            <div className="kpi">
-              <span className="lab">PPC semana</span>
-              <Ppc ppc={rSem.ppc} meta={p.meta} className="mid" />
-              <Medidor ppc={rSem.ppc} meta={p.meta} />
-              <span className="det num">{rSem.planeadas ? `${rSem.cumplidas} de ${rSem.planeadas}` : ""} · meta {p.meta} %</span>
+      <main className="contenido">
+        <div className="titular">
+          <h1>{titulo}</h1>
+          <span className="subtitulo num">{pestana === "cap" ? `${corta(dia)} · Semana ${semanaIso(lunes).semana}` : `Semana ${semanaIso(lunes).semana} · ${corta(lunes)} – ${corta(sumarDias(lunes, 5))}`}</span>
+        </div>
+
+        {conDias && (
+          <div className="dias" role="group" aria-label="Día de la semana">
+            {dias.map((d, i) => (
+              <button type="button" key={d} aria-pressed={d === dia} className={d === hoy() ? "hoy" : ""} onClick={() => setDia(d)}>
+                <small>{DIAS[i].slice(0, 1)}</small><b className="num">{Number(d.slice(8))}</b>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {pestana === "cap" && (
+          <section className="resumen" aria-label="PPC">
+            <Anillo ppc={rDia.ppc} meta={p.meta} tam={132} grosor={16} etiqueta="del día" />
+            <div className="resumen-datos">
+              <div><span className="lab">Cumplidas</span><b className="num">{rDia.cumplidas}<small>/{rDia.planeadas}</small></b></div>
+              <div><span className="lab">Semana</span><b className={`num lv-${nivel(rSem.ppc, p.meta)}`}>{formato(rSem.ppc)}</b></div>
+              <div><span className="lab">Meta</span><b className="num">{p.meta}%</b></div>
             </div>
           </section>
         )}
-
-        <nav className="tabs" role="tablist">
-          {PESTANAS.map(([k, t]) => (
-            <button type="button" role="tab" key={k} aria-selected={pestana === k} onClick={() => setPestana(k)}>{t}</button>
-          ))}
-        </nav>
 
         <section className="view">
           {pestana === "cap" && <Captura p={p} dia={dia} />}
           {pestana === "pla" && <Planear p={p} lunes={lunes} onRestriccion={(r) => { setPrefill(r); setPestana("res"); window.scrollTo(0, 0); }} />}
           {pestana === "res" && <Restricciones p={p} lunes={lunes} prefill={prefill} onPrefillUsado={() => setPrefill(null)} />}
-          {pestana === "sem" && <Semana p={p} lunes={lunes} dia={dia} />}
-          {pestana === "ana" && <Analisis p={p} lunes={lunes} />}
+          {pestana === "rep" && (
+            <>
+              <Segmentado opciones={[["sem", "Semana"], ["ana", "Análisis"]]} valor={vistaRep} onCambio={setVistaRep} />
+              {vistaRep === "sem" ? <Semana p={p} lunes={lunes} dia={dia} /> : <Analisis p={p} lunes={lunes} />}
+            </>
+          )}
           {pestana === "aju" && <Ajustes p={p} onCambiarProyecto={setProyectoId} nube={nube} />}
         </section>
-      </div>
+      </main>
+
+      <nav className="tabbar" role="tablist">
+        {PESTANAS.map(([k, t, ic]) => (
+          <button type="button" role="tab" key={k} aria-selected={pestana === k} onClick={() => { setPestana(k); window.scrollTo(0, 0); }}>
+            <Icono n={ic} tam={25} />
+            <span>{t}</span>
+          </button>
+        ))}
+      </nav>
       <Toast />
-    </>
+    </div>
   );
 }

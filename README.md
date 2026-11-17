@@ -16,7 +16,7 @@ App web instalable (PWA) para llevar el **Last Planner System** desde el celular
 - **Local (sin cuentas):** los datos se guardan en el teléfono (localStorage y, para las fotos, IndexedDB). Para pasar datos a otro teléfono se usa el respaldo en Ajustes.
 - **Nube (con Supabase):** inicio de sesión con código por correo, empresas, equipo con roles (administrador, supervisor, solo lectura), invitaciones con código, datos compartidos con cambios en vivo, fotos en la nube y cola sin conexión. Se activa al publicar con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (ver `.env.example`).
 
-La guía para dejarla funcionando con tus cuentas está en [`docs/PUESTA_EN_MARCHA.md`](docs/PUESTA_EN_MARCHA.md). El esquema y las reglas de seguridad están en [`supabase/schema.sql`](supabase/schema.sql), con pruebas en `supabase/prueba-reglas.mjs`.
+Las decisiones de diseño y arquitectura están en [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md). La guía para dejarla funcionando con tus cuentas está en [`docs/PUESTA_EN_MARCHA.md`](docs/PUESTA_EN_MARCHA.md). El esquema y las reglas de seguridad están en [`supabase/schema.sql`](supabase/schema.sql), con pruebas en `supabase/prueba-reglas.mjs`.
 
 ## Desarrollo
 ```bash

@@ -3,7 +3,7 @@ import type { Incumplimiento, Proyecto } from "../types";
 import { actualizar, guardarFoto, reducir, uid, useDatos } from "../data/store";
 import { DIAS, diasDeSemana, lunesDe } from "../lib/fechas";
 import { nivel } from "../lib/ppc";
-import { BotonConfirmar, Foto, Medidor, toast } from "./comun";
+import { BotonConfirmar, Foto, Hoja, Icono, Medidor, toast } from "./comun";
 
 type Borrador = Omit<Incumplimiento, "id" | "creado" | "actualizado"> & { id?: string; creado?: number };
 
@@ -68,7 +68,7 @@ export function Captura({ p, dia }: { p: Proyecto; dia: string }) {
 
   return (
     <>
-      <p className="hint">Pon cuántas actividades tenía planeadas cada contratista el {nombreDia} y registra cada una que no se cumplió. Las cumplidas se calculan solas.</p>
+      <p className="hint">Planeadas del {nombreDia} por contratista. Registra lo que no se cumplió; lo demás cuenta como cumplido.</p>
       <ul className="cts">
         {p.contratistas.map((c) => {
           const pl = planOf(c), list = incsOf(c), ok = Math.max(0, pl - list.length), ppc = pl ? Math.round((ok / pl) * 100) : null;
@@ -107,7 +107,13 @@ export function Captura({ p, dia }: { p: Proyecto; dia: string }) {
                   ))}
                 </div>
               )}
-              {abierto && borrador ? (
+              {!abierto && <button type="button" className="addinc" onClick={() => nuevo(c)}><Icono n="mas" tam={18} /> Registrar incumplimiento</button>}
+            </li>
+          );
+        })}
+      </ul>
+      {borrador && (
+        <Hoja titulo={borrador.id ? "Incumplimiento" : `No se cumplió · ${borrador.contratista}`} onCerrar={() => setBorrador(null)} accion="Guardar" onAccion={guardar}>
                 <div className="form">
                   <label className="field">
                     <span>Actividad no cumplida</span>
@@ -160,19 +166,10 @@ export function Captura({ p, dia }: { p: Proyecto; dia: string }) {
                     </div>
                   </div>
                   {error && <p className="warnline">{error}</p>}
-                  <div className="actions">
-                    {borrador.id && <BotonConfirmar onConfirm={borrar}>Borrar</BotonConfirmar>}
-                    <button type="button" className="btn ghost" onClick={() => setBorrador(null)}>Cancelar</button>
-                    <button type="button" className="btn grow" onClick={guardar}>{borrador.id ? "Guardar cambios" : "Guardar incumplimiento"}</button>
-                  </div>
+                  {borrador.id && <BotonConfirmar onConfirm={borrar}>Borrar incumplimiento</BotonConfirmar>}
                 </div>
-              ) : (
-                <button type="button" className="addinc" onClick={() => nuevo(c)}>+ Registrar incumplimiento</button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+        </Hoja>
+      )}
     </>
   );
 }

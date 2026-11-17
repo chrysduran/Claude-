@@ -39,6 +39,24 @@ export function cargarDemo(db: BaseDatos, hoy: string): string {
   const lunes = lunesDe(hoy);
   const dias = diasDeSemana(lunes).filter((d) => d <= hoy);
   const planes = [5, 2, 4, 1, 8, 4, 2];
+  // Historial de 7 semanas para que Análisis muestre tendencia y patrones (datos inventados).
+  const causasHist = ["MAT", "PRE", "INF", "CAL", "LOG"];
+  for (let w = 7; w >= 1; w--) {
+    const l = sumarDias(lunes, -7 * w);
+    diasDeSemana(l).forEach((f, di) =>
+      p.contratistas.forEach((c, ci) => {
+        db.conteos.push({ id: `${p.id}|${f}|${c}`, proyectoId: p.id, fecha: f, contratista: c, planeadas: planes[ci] + ((di + ci + w) % 2), actualizado: Date.now() });
+        const fallas = ((w * 7 + di * 3 + ci * 5) % (w === 5 || w === 6 ? 3 : w === 4 ? 4 : 6) === 0 ? 1 : 0) + (w === 6 && di < 4 && ci !== 2 ? 1 : 0);
+        const pisosRepite = c === "Pisos y acabados" && w <= 3 && di % 2 === 0;
+        for (let k = 0; k < fallas + (pisosRepite ? 1 : 0); k++)
+          db.incumplimientos.push({
+            id: uid(), proyectoId: p.id, fecha: f, contratista: c, actividad: pisosRepite && k === fallas ? `Piso cerámico depto ${700 + di * 100 + ci}` : `Actividad ${di + 1}-${ci + 1}`,
+            zona: `N${(di + ci) % 12 + 1}`, causa: pisosRepite && k === fallas ? "MO" : causasHist[(w + di + ci) % causasHist.length],
+            notas: "", contramedida: "", responsable: "", fechaCompromiso: "", fotoId: "", creado: Date.now(), actualizado: Date.now(),
+          });
+      }),
+    );
+  }
   dias.forEach((f, di) =>
     p.contratistas.forEach((c, ci) =>
       db.conteos.push({ id: `${p.id}|${f}|${c}`, proyectoId: p.id, fecha: f, contratista: c, planeadas: planes[ci] + ((di + ci) % 2), actualizado: Date.now() }),

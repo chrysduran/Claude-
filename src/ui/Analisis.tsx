@@ -4,6 +4,9 @@ import { claveSemana, diasDeSemana, lunesDe, sumarDias } from "../lib/fechas";
 import { calcular, nivel, patrones } from "../lib/ppc";
 import { Vacio } from "./comun";
 
+/** Las barras usan el 84 % de la altura; el resto queda para la etiqueta del valor. Barras y meta comparten escala. */
+const ESCALA = 0.84;
+
 export function Analisis({ p, lunes }: { p: Proyecto; lunes: string }) {
   const db = useDatos();
   const conteos = db.conteos.filter((c) => c.proyectoId === p.id);
@@ -28,13 +31,13 @@ export function Analisis({ p, lunes }: { p: Proyecto; lunes: string }) {
         <span className="lab">Tendencia</span>
         <h2>PPC semanal</h2>
         <div className="trend">
-          <div className="goal" style={{ bottom: `${p.meta}%` }}><span>Meta {p.meta}%</span></div>
+          <div className="goal" style={{ bottom: `${p.meta * ESCALA}%` }}><span>Meta {p.meta}%</span></div>
           {ult8.map((l) => {
             const r = calcular(conteos, incs, diasDeSemana(l), p.contratistas);
             return (
               <div className="col" key={l}>
                 <b className={`num lv-${nivel(r.ppc, p.meta)}`}>{r.ppc == null ? "—" : Math.round(r.ppc)}</b>
-                <i className={`bg-${nivel(r.ppc, p.meta)}`} style={{ height: `calc(${r.ppc ?? 0}% - 18px)` }} />
+                <i className={`bg-${nivel(r.ppc, p.meta)}`} style={{ height: `${(r.ppc ?? 0) * ESCALA}%` }} />
               </div>
             );
           })}

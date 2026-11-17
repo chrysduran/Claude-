@@ -7,20 +7,34 @@ export interface Resultado {
   ppc: number | null; // porcentaje con un decimal
 }
 
+/* Índices por (fecha, contratista). Se calculan una vez por arreglo y se reutilizan mientras no cambie. */
+const indPlan = new WeakMap<Conteo[], Map<string, number>>();
+const indInc = new WeakMap<Incumplimiento[], Map<string, number>>();
+function indice<T>(cache: WeakMap<T[], Map<string, number>>, xs: T[], valor: (x: T) => number, clave: (x: T) => string) {
+  let m = cache.get(xs);
+  if (!m) {
+    m = new Map();
+    for (const x of xs) m.set(clave(x), (m.get(clave(x)) ?? 0) + valor(x));
+    cache.set(xs, m);
+  }
+  return m;
+}
+
 /**
  * PPC = cumplidas / planeadas. Las cumplidas se calculan como planeadas − incumplimientos,
  * por contratista y por día, sin contar más incumplimientos que actividades planeadas.
+ * Para que sea rápido, pasa arreglos estables (memorizados) y se indexan una sola vez.
  */
 export function calcular(conteos: Conteo[], incs: Incumplimiento[], fechas: string[], contratistas: string[]): Resultado {
+  const P = indice(indPlan, conteos, (x) => x.planeadas, (x) => `${x.fecha}|${x.contratista}`);
+  const I = indice(indInc, incs, () => 1, (x) => `${x.fecha}|${x.contratista}`);
   let planeadas = 0;
   let incumplidas = 0;
-  const fs = new Set(fechas);
-  for (const f of fs) {
+  for (const f of new Set(fechas)) {
     for (const c of contratistas) {
-      const p = conteos.filter((x) => x.fecha === f && x.contratista === c).reduce((a, x) => a + x.planeadas, 0);
-      const n = incs.filter((x) => x.fecha === f && x.contratista === c).length;
+      const p = P.get(`${f}|${c}`) ?? 0;
       planeadas += p;
-      incumplidas += Math.min(n, p);
+      incumplidas += Math.min(I.get(`${f}|${c}`) ?? 0, p);
     }
   }
   const cumplidas = planeadas - incumplidas;

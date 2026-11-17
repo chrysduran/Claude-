@@ -7,6 +7,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      workbox: {
+        // La librería de Excel (~940 KB) no se descarga al instalar: se baja la primera vez que se exporta y queda guardada.
+        globIgnores: ["**/exceljs*.js"],
+        runtimeCaching: [{ urlPattern: /\/assets\/exceljs.*\.js$/, handler: "CacheFirst", options: { cacheName: "exceljs", expiration: { maxEntries: 2 } } }],
+        navigateFallbackDenylist: [/^\/privacidad\.html$/],
+      },
       includeAssets: ["icon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Pulso Obra",
