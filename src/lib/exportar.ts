@@ -6,7 +6,7 @@ import { calcular } from "./ppc";
 export async function excelSemana(db: BaseDatos, p: Proyecto, lunes: string): Promise<Blob> {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Bitácora LPS";
+  wb.creator = "Pulso Obra";
   const dias = diasDeSemana(lunes);
   const sem = semanaIso(lunes).semana;
   const conteos = db.conteos.filter((c) => c.proyectoId === p.id);

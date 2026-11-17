@@ -26,7 +26,7 @@ export function Ajustes({ p, onCambiarProyecto }: { p: Proyecto | null; onCambia
   const respaldo = () => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(db, null, 1)], { type: "application/json" }));
-    a.download = `bitacora-lps-respaldo-${hoy()}.json`;
+    a.download = `pulso-obra-respaldo-${hoy()}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   };
@@ -40,7 +40,7 @@ export function Ajustes({ p, onCambiarProyecto }: { p: Proyecto | null; onCambia
       onCambiarProyecto(d.proyectos[0]?.id ?? "");
       toast("Respaldo restaurado");
     } catch {
-      toast("Ese archivo no es un respaldo válido de Bitácora LPS.");
+      toast("Ese archivo no es un respaldo válido de Pulso Obra.");
     }
   };
 

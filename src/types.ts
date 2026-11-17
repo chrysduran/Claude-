@@ -1,4 +1,4 @@
-/** Modelo de datos de Bitácora LPS. Todo pertenece a un proyecto; los catálogos son configurables por proyecto. */
+/** Modelo de datos de Pulso Obra. Todo pertenece a un proyecto; los catálogos son configurables por proyecto. */
 
 export interface Causa {
   codigo: string;

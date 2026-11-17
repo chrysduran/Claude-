@@ -1,4 +1,6 @@
-# Bitácora LPS
+# Pulso Obra
+
+*El pulso diario de tu obra.* Dominio previsto: pulsobra.app
 
 App web instalable (PWA) para llevar el **Last Planner System** desde el celular:
 

@@ -1,4 +1,4 @@
-/* Bitácora LPS · banda de marca en verde petróleo, una columna, controles del tamaño del pulgar */
+/* Pulso Obra · banda de marca en verde petróleo, una columna, controles del tamaño del pulgar */
 :root {
   --brand: #16505a; --brand-deep: #0e3a42; --brand-ink: #16505a; --on-brand: #fff;
   --bg: #f4f6f6; --surface: #fff; --sunk: #eceff0; --ink: #141c1b; --muted: #5a6766; --line: #d7dddd;
@@ -174,6 +174,7 @@ table.t tr.sel td { background: var(--sunk); }
 .bienvenida { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding-block: 40px; max-width: 460px; }
 .bienvenida h1 { font-family: var(--f-display); font-size: 2.2rem; margin: 0; }
 .bienvenida p { color: var(--muted); margin: 0 0 8px; }
+.bienvenida .lema { font-family: var(--f-display); font-weight: 600; color: var(--brand-ink); font-size: 1.1rem; margin: -6px 0 0; }
 .bienvenida img { border-radius: 18px; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: .9rem; z-index: 20; max-width: calc(100% - 32px); text-align: center; }
 @media (max-width: 420px) { .causas, .row2 { grid-template-columns: 1fr; } .big { font-size: 2.1rem; } .tk-u { width: 64px; } }

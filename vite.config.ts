@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icon.svg"],
       manifest: {
-        name: "Bitácora LPS",
-        short_name: "Bitácora LPS",
+        name: "Pulso Obra",
+        short_name: "Pulso Obra",
         description: "Captura de PPC, incumplimientos, restricciones y planeación semanal del Last Planner System desde el celular.",
         lang: "es-MX",
         theme_color: "#16505A",

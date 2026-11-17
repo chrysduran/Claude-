@@ -48,7 +48,8 @@ export default function App() {
     return (
       <main className="bienvenida in">
         <img src="/icon.svg" alt="" width={72} height={72} />
-        <h1>Bitácora LPS</h1>
+        <h1>Pulso Obra</h1>
+        <p className="lema">El pulso diario de tu obra.</p>
         <p>Captura el PPC, las causas de no cumplimiento, las restricciones y la planeación semanal del Last Planner desde el celular.</p>
         <button type="button" className="btn" onClick={() => { const np = proyectoNuevo("Mi proyecto"); actualizar((d) => { d.proyectos.push(np); }); setProyectoId(np.id); setPestana("aju"); }}>Crear mi proyecto</button>
         <button type="button" className="btn ghost" onClick={() => { let id = ""; actualizar((d) => { id = cargarDemo(d, hoy()); }); setProyectoId(id); }}>Ver un proyecto de ejemplo</button>
@@ -70,7 +71,7 @@ export default function App() {
       <header className="band">
         <div className="in">
           <div className="brandrow">
-            <div className="marca"><b>Bitácora LPS</b>
+            <div className="marca"><b>Pulso Obra</b>
               {db.proyectos.length > 1 ? (
                 <select aria-label="Proyecto" value={p.id} onChange={(e) => setProyectoId(e.target.value)}>{db.proyectos.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
               ) : <span>{p.nombre}</span>}

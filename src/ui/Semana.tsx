@@ -24,7 +24,7 @@ export function Semana({ p, lunes, dia }: { p: Proyecto; lunes: string; dia: str
       const blob = await excelSemana(db, p, lunes);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `Bitacora_LPS_${p.nombre.replace(/[^\w]+/g, "_")}_${semana}.xlsx`;
+      a.download = `Pulso_Obra_${p.nombre.replace(/[^\w]+/g, "_")}_${semana}.xlsx`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     } catch {
