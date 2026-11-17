@@ -75,9 +75,51 @@ Vercel: hospedaje estático + encabezados de seguridad
 - Pantalla de recuperación: si la interfaz falla, se ofrece recargar y descargar un respaldo de emergencia en lugar de una pantalla en blanco.
 - Códigos de invitación aleatorios, de un solo uso y con 7 días de vigencia.
 
+## ADR-007 · Seguridad en la base de datos, probada en cada cambio
+**Estado:** aceptada · **Fecha:** 17 nov 2026
+
+**Contexto.** Para venderla a otras constructoras, la app tiene que resistir a un usuario malintencionado con la llave pública en la mano, no solo a uno distraído. Revisión con criterios OWASP (control de acceso, inyección, abuso de recursos, exposición de datos).
+
+| Riesgo encontrado | Corrección |
+|---|---|
+| Un administrador podía reescribir el correo o mover la fila de otro miembro | Solo puede cambiar la columna `rol` (permiso por columna) |
+| Una empresa podía quedarse sin administrador | Disparador `cuidar_admin` lo impide |
+| Usar un código nuevo podía bajar el rol de quien ya era miembro | Quien ya es miembro conserva su rol |
+| Códigos de invitación adivinables por fuerza bruta | Alfabeto de 31 caracteres sin ambiguos (~850 mil millones de combinaciones) y freno de 8 intentos fallidos por hora |
+| Textos, catálogos o números sin límite (llenar la base) | Límites en cada columna, fechas con formato validado |
+| Fotos: cualquier tipo y tamaño | Solo imágenes, máximo 5 MB, bucket privado |
+| Funciones internas llamables sin sesión | Permisos revocados para anónimos |
+| Nombres de foto predecibles | Identificadores con `crypto.getRandomValues` |
+| Sin rastro de quién cambió qué | Bitácora escrita por la base; solo el admin la lee, nadie la altera |
+| Datos de la empresa quedaban en el teléfono al cerrar sesión o salir | Se borran (datos y fotos) al cerrar sesión, al salir y al dejar de ser miembro |
+| Respaldo o almacenamiento dañado podían romper la app o inyectar datos raros | `sanear` valida y limpia todo lo que se lee; lo dañado se aparta, no se pierde |
+| Encabezados | Se agregan `X-Frame-Options`, COOP, CORP, `object-src 'none'`, `upgrade-insecure-requests`, HSTS con preload |
+
+**Pruebas.** `npm run test:reglas`: 18 casos contra un Supabase real, incluidos los de arriba.
+
+**Riesgo aceptado.** `npm audit` reporta `uuid` (moderado) dentro de exceljs: la falla está en las versiones v3/v5/v6 con búfer propio, que exceljs no usa. Revisar al actualizar exceljs.
+
+## ADR-008 · Experiencia de app de iPhone
+**Estado:** aceptada
+
+**Decisión.** Que la app web se sienta nativa en iPhone sin pasar por la App Store (ver ADR-001):
+- Hojas que se cierran deslizando hacia abajo, se acomodan sobre el teclado y piden confirmar antes de descartar cambios.
+- Ningún campo con letra menor a 16 px (iOS hace zoom al enfocarlo); áreas táctiles de 36 a 48 px; sin selección de texto ni menús de pulsación larga en botones.
+- Alto de pantalla dinámico (`dvh`) para la barra de Safari, sin rebote elástico detrás de las barras.
+- Tocar otra vez la pestaña activa sube al inicio, como en iOS.
+- Aviso que explica cómo instalarla (Compartir → Agregar a inicio) y botón Instalar en Android.
+- Indicador "Sin señal" y, al volver a la app, se envía lo pendiente y se trae lo nuevo (iOS corta la conexión en vivo en segundo plano).
+- Las versiones nuevas ya no recargan la app solas a media captura: se avisa y el usuario decide.
+- Se pide almacenamiento persistente para que iOS no borre los datos de una app poco usada.
+
+**Rendimiento de sincronización.** La cola manda las filas en lotes de hasta 200 por petición en lugar de una por una (el proyecto demo pasa de ~400 peticiones a ~5). Si la nube rechaza un lote, se reintenta fila por fila para apartar solo la que falla y se restaura la versión de la empresa.
+
+**Pruebas.** Recorrido automático en un iPhone 13 emulado (18 verificaciones) y en dos teléfonos contra la nube (13 verificaciones).
+
 ## Pendientes recomendados
 1. **Monitoreo de errores** (por ejemplo Sentry) para enterarse de fallas antes que los usuarios.
 2. **Pruebas de punta a punta en GitHub Actions** con Playwright y un Supabase de prueba.
-3. **Borrado suave y bitácora de cambios** (quién cambió qué y cuándo) para auditoría con clientes.
-4. **Exportación con el formato del cliente** configurable por empresa.
-5. **Planes y cobro** por proyecto o por usuario, cuando haya clientes.
+3. **Exportación con el formato del cliente** configurable por empresa.
+4. **Planes y cobro** por proyecto o por usuario, cuando haya clientes.
+5. **Notificaciones** (restricciones vencidas, PPC bajo la meta) cuando la app esté instalada (iOS 16.4+).
+6. **Empaquetar con Capacitor** si un cliente exige verla en la App Store.

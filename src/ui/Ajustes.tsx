@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { BaseDatos, Proyecto } from "../types";
-import { actualizar, useDatos } from "../data/store";
+import { actualizar, sanear, useDatos } from "../data/store";
 import { cargarDemo, proyectoNuevo } from "../data/demo";
 import { hoy } from "../lib/fechas";
 import { BotonConfirmar, toast } from "./comun";
@@ -37,9 +37,10 @@ export function Ajustes({ p, onCambiarProyecto, nube }: { p: Proyecto | null; on
   const restaurar = async (f: File | undefined) => {
     if (!f) return;
     try {
-      const d = JSON.parse(await f.text()) as BaseDatos;
-      if (d.version !== 1 || !Array.isArray(d.proyectos)) throw new Error();
-      actualizar(() => d);
+      if (f.size > 50 * 1024 * 1024) throw new Error();
+      const d = sanear(JSON.parse(await f.text()));
+      if (!d) throw new Error();
+      actualizar(() => d as BaseDatos);
       onCambiarProyecto(d.proyectos[0]?.id ?? "");
       toast("Respaldo restaurado");
     } catch {

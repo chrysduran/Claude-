@@ -11,10 +11,46 @@ let clave = CLAVE_LOCAL;
 
 export const vacia = (): BaseDatos => ({ version: 1, proyectos: [], conteos: [], incumplimientos: [], restricciones: [], plan: [], narracion: [] });
 
+const COLECCIONES_HIJAS = ["conteos", "incumplimientos", "restricciones", "plan", "narracion"] as const;
+
+/**
+ * Revisa que un objeto leído de un archivo o del almacenamiento tenga la forma de la base de datos.
+ * Descarta filas mal formadas en lugar de dejar que rompan la app. Devuelve null si no es una base de Pulso Obra.
+ */
+export function sanear(x: unknown): BaseDatos | null {
+  if (!x || typeof x !== "object" || (x as { version?: unknown }).version !== 1) return null;
+  const o = x as Record<string, unknown>;
+  const filas = (v: unknown) => (Array.isArray(v) ? v.filter((f) => f && typeof f === "object" && typeof (f as { id?: unknown }).id === "string" && (f as { id: string }).id) : null);
+  const textos = (v: unknown) => (Array.isArray(v) ? v.filter((s): s is string => typeof s === "string") : []);
+  const proyectos = filas(o.proyectos ?? []);
+  if (!proyectos) return null;
+  const db = vacia();
+  db.proyectos = proyectos.map((p) => ({
+    ...p,
+    nombre: typeof p.nombre === "string" && p.nombre.trim() ? p.nombre : "Proyecto",
+    meta: Number(p.meta) >= 1 && Number(p.meta) <= 100 ? Number(p.meta) : 85,
+    contratistas: textos(p.contratistas),
+    zonas: textos(p.zonas),
+    causas: Array.isArray(p.causas) ? p.causas.filter((c: unknown) => c && typeof (c as { codigo?: unknown }).codigo === "string" && typeof (c as { descripcion?: unknown }).descripcion === "string") : [],
+    creado: Number(p.creado) || 0,
+  }));
+  const ids = new Set(db.proyectos.map((p) => p.id));
+  for (const c of COLECCIONES_HIJAS) {
+    const v = filas(o[c] ?? []);
+    if (!v) return null;
+    (db[c] as unknown[]) = v.filter((f) => ids.has((f as { proyectoId?: string }).proyectoId ?? ""));
+  }
+  return db;
+}
+
 export function leerClave(k: string): BaseDatos {
   try {
     const raw = localStorage.getItem(k);
-    if (raw) return { ...vacia(), ...JSON.parse(raw) };
+    if (raw) {
+      const db = sanear(JSON.parse(raw));
+      if (db) return db;
+      localStorage.setItem(`${k}:dañado`, raw); // no se pierde: queda apartado para soporte
+    }
   } catch {
     /* almacenamiento bloqueado o dañado: se arranca vacío */
   }
@@ -80,12 +116,15 @@ export function useDatos(): BaseDatos {
   );
 }
 
-export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+/** Identificador único e impredecible (también nombra las fotos en la nube, así que no debe poder adivinarse). */
+export const uid = () => Date.now().toString(36) + Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => b.toString(36).padStart(2, "0")).join("");
 
 /* ---------- Fotos en IndexedDB (no caben en localStorage) ---------- */
+const FOTOS_LOCAL = "bitacora-lps-fotos";
+const FOTOS_NUBE = "pulso-obra-fotos-nube"; // copia en el teléfono de las fotos de la empresa; se borra al cerrar sesión
 const abrir = () =>
   new Promise<IDBDatabase>((ok, mal) => {
-    const r = indexedDB.open("bitacora-lps-fotos", 1);
+    const r = indexedDB.open(remotas ? FOTOS_NUBE : FOTOS_LOCAL, 1);
     r.onupgradeneeded = () => r.result.createObjectStore("fotos");
     r.onsuccess = () => ok(r.result);
     r.onerror = () => mal(r.error);
@@ -97,6 +136,7 @@ interface FotosRemotas {
 }
 let remotas: FotosRemotas | null = null;
 export const usarFotosRemotas = (r: FotosRemotas | null) => (remotas = r);
+export const borrarFotosDeNube = () => { try { indexedDB.deleteDatabase(FOTOS_NUBE); } catch { /* sin IndexedDB */ } };
 
 async function guardarLocal(id: string, blob: Blob) {
   const db = await abrir();

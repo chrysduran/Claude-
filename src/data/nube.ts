@@ -1,7 +1,7 @@
 import { createClient, type RealtimeChannel, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import type { BaseDatos } from "../types";
-import { aplicarRemoto, CLAVE_LOCAL, estadoActual, leerClave, soloLectura, usarAlmacen, usarFotosRemotas, vacia } from "./store";
-import { COLECCIONES, coleccionDe, compactar, deFila, diferencias, esErrorDefinitivo, TABLAS, type Operacion } from "./sync";
+import { aplicarRemoto, borrarFotosDeNube, CLAVE_LOCAL, estadoActual, leerClave, soloLectura, usarAlmacen, usarFotosRemotas, vacia } from "./store";
+import { COLECCIONES, coleccionDe, compactar, deFila, diferencias, esErrorDefinitivo, primerLote, TABLAS, type Operacion } from "./sync";
 
 /**
  * Modo nube con Supabase. Se activa si la app se publica con las variables
@@ -43,6 +43,7 @@ export async function crearEmpresa(nombre: string): Promise<string> {
 export async function unirse(codigo: string): Promise<string> {
   const { data, error } = await sb!.rpc("unirse", { p_codigo: codigo });
   if (error) throw error;
+  if (!data) throw new Error("El código no existe, ya se usó o venció.");
   return data as string;
 }
 
@@ -72,6 +73,55 @@ export async function cambiarRol(empresaId: string, usuarioId: string, rol: Rol)
 export async function quitarMiembro(empresaId: string, usuarioId: string) {
   const { error } = await sb!.from("miembros").delete().eq("empresa_id", empresaId).eq("usuario_id", usuarioId);
   if (error) throw error;
+}
+
+export interface Movimiento {
+  id: number;
+  tabla: string;
+  operacion: "alta" | "cambio" | "baja";
+  email: string;
+  resumen: string;
+  cuando: string;
+}
+
+/** Últimos movimientos de la empresa (solo administradores). */
+export async function bitacora(empresaId: string, limite = 40): Promise<Movimiento[]> {
+  const { data, error } = await sb!.from("bitacora").select("id, tabla, operacion, email, resumen, cuando").eq("empresa_id", empresaId).order("id", { ascending: false }).limit(limite);
+  if (error) throw error;
+  return (data ?? []) as Movimiento[];
+}
+
+/** Borra la empresa con todos sus proyectos, registros, miembros y fotos. No se puede deshacer. */
+export async function borrarEmpresa(empresaId: string) {
+  const fotos = sb!.storage.from("fotos");
+  for (;;) {
+    const { data, error } = await fotos.list(empresaId, { limit: 100 });
+    if (error) throw error;
+    if (!data?.length) break;
+    const { error: e2 } = await fotos.remove(data.map((f) => `${empresaId}/${f.name}`));
+    if (e2) throw e2;
+  }
+  const { data, error } = await sb!.from("empresas").delete().eq("id", empresaId).select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("Solo un administrador puede borrar la empresa.");
+  limpiarTelefono([]);
+}
+
+/**
+ * Quita de este teléfono las copias de empresas a las que el usuario ya no debe tener acceso
+ * (al cerrar sesión, al salir de una empresa o al borrarla). `conservar` son las empresas que siguen vigentes.
+ */
+export function limpiarTelefono(conservar: string[]) {
+  try {
+    const sobran: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)!;
+      const m = k.match(/^pulso-obra:(?:nube|pendientes):(.+)$/);
+      if (m && !conservar.includes(m[1])) sobran.push(k);
+    }
+    sobran.forEach((k) => localStorage.removeItem(k));
+  } catch { /* sin almacenamiento */ }
+  if (!conservar.length) borrarFotosDeNube();
 }
 
 /* ---------- Carga completa ---------- */
@@ -110,26 +160,77 @@ function escribirPendientes(ops: Operacion[]) {
   alCambiarPendientes(ops.length);
 }
 
+const firma = (o: Operacion) => JSON.stringify(o);
+
+/** Manda un grupo de operaciones de la misma tabla y tipo en una sola petición. */
+async function mandar(lote: Operacion[]) {
+  const q = sb!.from(lote[0].tabla);
+  const { error, status } = lote[0].tipo === "upsert"
+    ? await q.upsert(lote.map((o) => o.fila!), { defaultToNull: false })
+    : await q.delete().in("id", lote.map((o) => o.id));
+  return error ? { ...error, status } : null;
+}
+
+/** Quita de la cola solo lo que se mandó; lo que se capturó mientras tanto se queda para la siguiente vuelta. */
+function quitarDeCola(enviadas: Operacion[]) {
+  const s = new Set(enviadas.map(firma));
+  escribirPendientes(leerPendientes().filter((o) => !s.has(firma(o))));
+}
+
 let enviando = false;
 export async function enviarPendientes() {
   if (enviando || !sb || !empresaActual) return;
   enviando = true;
+  const empresa = empresaActual;
+  let rechazadas = 0;
   try {
-    let ops = compactar(leerPendientes());
-    while (ops.length) {
-      const op = ops[0];
-      const q = sb.from(op.tabla);
-      const { error, status } = op.tipo === "upsert" ? await q.upsert(op.fila!) : await q.delete().eq("id", op.id);
-      if (error) {
-        if (!esErrorDefinitivo({ ...error, status })) break; // sin conexión: se reintenta después
-        avisar(`No se pudo guardar en la nube: ${error.message}`);
+    for (;;) {
+      const ops = compactar(leerPendientes());
+      if (!ops.length || empresa !== empresaActual) break;
+      const lote = primerLote(ops);
+      const error = await mandar(lote);
+      if (empresa !== empresaActual) break;
+      if (!error) { quitarDeCola(lote); continue; }
+      if (!esErrorDefinitivo(error)) break; // sin conexión: se reintenta después
+      if (lote.length > 1) {
+        // La nube rechazó el grupo: se manda fila por fila para apartar solo la que está mal.
+        let corte = false;
+        for (const op of lote) {
+          const e = await mandar([op]);
+          if (e && !esErrorDefinitivo(e)) { corte = true; break; }
+          if (e) rechazadas++;
+          quitarDeCola([op]);
+        }
+        if (corte) break;
+      } else {
+        rechazadas++;
+        quitarDeCola(lote);
       }
-      ops = ops.slice(1);
-      escribirPendientes(ops);
+    }
+    if (rechazadas && empresa === empresaActual) {
+      avisar(rechazadas === 1 ? "La nube no aceptó un cambio (revisa tu permiso). Se restauró la versión de la empresa." : `La nube no aceptó ${rechazadas} cambios. Se restauró la versión de la empresa.`);
+      await traerDeNube(empresa).catch(() => {});
     }
   } finally {
     enviando = false;
   }
+}
+
+/** Trae la versión de la nube y le pone encima lo que este teléfono todavía no envía. */
+async function traerDeNube(empresaId: string) {
+  const remoto = await cargarEmpresa(empresaId);
+  if (empresaId !== empresaActual) return;
+  const pend = leerPendientes();
+  aplicarRemoto(() => {
+    const d = remoto;
+    for (const op of pend) {
+      const c = coleccionDe(op.tabla)!;
+      const lista = (d[c] as { id: string }[]).filter((x) => x.id !== op.id);
+      if (op.tipo === "upsert") lista.push(deFila(op.fila!));
+      (d[c] as unknown) = lista;
+    }
+    return d;
+  });
 }
 
 function encolar(antes: BaseDatos, despues: BaseDatos) {
@@ -187,19 +288,7 @@ export async function abrirEmpresa(m: Membresia, opciones: { avisar: (m: string)
   alCambiarPendientes(leerPendientes().length);
   await enviarPendientes();
   try {
-    const remoto = await cargarEmpresa(m.empresaId);
-    // Lo que todavía no se envía se conserva encima de lo que vino de la nube.
-    const pend = leerPendientes();
-    aplicarRemoto(() => {
-      const d = remoto;
-      for (const op of pend) {
-        const c = coleccionDe(op.tabla)!;
-        const lista = (d[c] as { id: string }[]).filter((x) => x.id !== op.id);
-        if (op.tipo === "upsert") lista.push(deFila(op.fila!));
-        (d[c] as unknown) = lista;
-      }
-      return d;
-    });
+    await traerDeNube(m.empresaId);
   } catch {
     avisar("Sin conexión: estás viendo la última copia guardada en este teléfono.");
   }
@@ -215,8 +304,22 @@ export function cerrarEmpresa() {
   usarAlmacen(CLAVE_LOCAL, null);
 }
 
+/**
+ * Al volver a la app (el iPhone corta la conexión en vivo cuando la app queda en segundo plano) o al recuperar la señal,
+ * se manda lo pendiente y se trae lo que otros capturaron mientras tanto.
+ */
+let ultimaPuestaAlDia = 0;
+async function ponerseAlDia() {
+  if (!empresaActual || Date.now() - ultimaPuestaAlDia < 15000) return;
+  ultimaPuestaAlDia = Date.now();
+  const empresa = empresaActual;
+  await enviarPendientes();
+  await traerDeNube(empresa).catch(() => {});
+}
+
 if (typeof window !== "undefined") {
-  window.addEventListener("online", () => void enviarPendientes());
+  window.addEventListener("online", () => void ponerseAlDia());
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void ponerseAlDia(); });
   setInterval(() => void enviarPendientes(), 30000);
 }
 

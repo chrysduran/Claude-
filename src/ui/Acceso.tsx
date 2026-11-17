@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { crearEmpresa, membresias, sb, unirse, type Membresia } from "../data/nube";
+import { crearEmpresa, limpiarTelefono, membresias, sb, unirse, type Membresia } from "../data/nube";
 import { Toast } from "./comun";
 
 const recordar = (k: string, v?: string) => {
@@ -24,11 +24,13 @@ export function Acceso({ children }: { children: (m: Membresia, cambiar: () => v
     return () => data.subscription.unsubscribe();
   }, []);
 
-  const cargar = () => membresias().then(setLista).catch((e) => setError(e.message));
+  // Al cargar las empresas, se borran del teléfono las copias de empresas de las que el usuario ya no es miembro.
+  const cargar = () => membresias().then((l) => { limpiarTelefono(l.map((m) => m.empresaId)); setLista(l); }).catch(() => setError("No se pudieron cargar tus empresas. Revisa tu conexión y vuelve a abrir la app."));
   useEffect(() => { if (sesion) void cargar(); else setLista(null); }, [sesion?.user.id]);
 
   const salir = async () => {
-    await sb!.auth.signOut();
+    await sb!.auth.signOut().catch(() => {});
+    limpiarTelefono([]); // nadie más que use este teléfono ve los datos de la empresa
     setElegida("");
     recordar("pulso-obra:empresa", "");
   };
@@ -61,7 +63,7 @@ function IniciarSesion() {
 
   const pedir = async () => {
     const e = email.trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(e)) return setMsg("Escribe un correo válido.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) || e.length > 254) return setMsg("Escribe un correo válido.");
     setOcupado(true); setMsg("");
     const { error } = await sb!.auth.signInWithOtp({ email: e, options: { emailRedirectTo: location.origin } });
     setOcupado(false);
@@ -73,7 +75,7 @@ function IniciarSesion() {
     setOcupado(true); setMsg("");
     const { error } = await sb!.auth.verifyOtp({ email: email.trim().toLowerCase(), token: codigo.trim(), type: "email" });
     setOcupado(false);
-    if (error) setMsg("El código no es correcto o ya venció. Pide uno nuevo.");
+    if (error) setMsg(/rate|too many/i.test(error.message) ? "Demasiados intentos. Espera unos minutos." : "El código no es correcto o ya venció. Pide uno nuevo.");
   };
 
   return (
@@ -85,7 +87,7 @@ function IniciarSesion() {
         <>
           <p>Escribe tu correo y te mandamos un código para entrar. No necesitas contraseña.</p>
           <label className="field"><span>Correo</span>
-            <input type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && pedir()} />
+            <input type="email" autoComplete="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="send" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && pedir()} />
           </label>
           <button type="button" className="btn" disabled={ocupado} onClick={pedir}>{ocupado ? "Enviando…" : "Enviarme el código"}</button>
         </>
@@ -93,7 +95,7 @@ function IniciarSesion() {
         <>
           <p>Te mandamos un código a <b>{email}</b>. Escríbelo aquí, o abre el enlace del correo en este teléfono.</p>
           <label className="field"><span>Código</span>
-            <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && verificar()} />
+            <input type="text" inputMode="numeric" autoComplete="one-time-code" enterKeyHint="go" maxLength={8} autoFocus value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && verificar()} />
           </label>
           <button type="button" className="btn" disabled={ocupado || codigo.length < 6} onClick={verificar}>{ocupado ? "Verificando…" : "Entrar"}</button>
           <button type="button" className="btn ghost" onClick={() => { setEnviado(false); setCodigo(""); }}>Usar otro correo</button>
@@ -135,7 +137,7 @@ function ElegirEmpresa({ lista, email, onElegir, onListo, onSalir }: { lista: Me
         <h2>Unirme a una empresa</h2>
         <p className="hint">Pídele a un administrador un código de invitación.</p>
         <div className="pl-nr">
-          <input type="text" value={codigo} placeholder="Código de 8 caracteres" maxLength={8} onChange={(e) => setCodigo(e.target.value.toUpperCase())} />
+          <input type="text" value={codigo} placeholder="Código de 8 caracteres" maxLength={8} autoCapitalize="characters" autoCorrect="off" spellCheck={false} onChange={(e) => setCodigo(e.target.value.toUpperCase())} />
           <button type="button" className="mini" disabled={ocupado || codigo.trim().length < 6} onClick={() => hacer(() => unirse(codigo))}>Unirme</button>
         </div>
       </div>
@@ -143,7 +145,7 @@ function ElegirEmpresa({ lista, email, onElegir, onListo, onSalir }: { lista: Me
         <h2>Crear mi empresa</h2>
         <p className="hint">Quedarás como administrador y podrás invitar a tu equipo.</p>
         <div className="pl-nr">
-          <input type="text" value={nombre} placeholder="Nombre de la empresa" onChange={(e) => setNombre(e.target.value)} />
+          <input type="text" value={nombre} placeholder="Nombre de la empresa" maxLength={120} onChange={(e) => setNombre(e.target.value)} />
           <button type="button" className="mini" disabled={ocupado || !nombre.trim()} onClick={() => hacer(() => crearEmpresa(nombre))}>Crear</button>
         </div>
       </div>

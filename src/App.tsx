@@ -6,7 +6,7 @@ import { Acceso } from "./ui/Acceso";
 import { cargarDemo, proyectoNuevo } from "./data/demo";
 import { corta, DIAS, diasDeSemana, hoy, lunesDe, semanaIso, sumarDias } from "./lib/fechas";
 import { calcular, formato, nivel } from "./lib/ppc";
-import { Anillo, Icono, Segmentado, toast, Toast } from "./ui/comun";
+import { Anillo, Avisos, Icono, Segmentado, toast, Toast, useEnLinea } from "./ui/comun";
 import { Captura } from "./ui/Captura";
 import { Planear } from "./ui/Planear";
 import { Restricciones } from "./ui/Restricciones";
@@ -60,6 +60,7 @@ function ConNube({ m, cambiar, salir }: { m: Membresia; cambiar: () => void; sal
 
 function Principal({ nube }: { nube: Nube | null }) {
   const db = useDatos();
+  const enLinea = useEnLinea();
   const admin = !nube || nube.m.rol === "admin";
   const [proyectoId, setProyectoId] = useState<string>(() => recordar<string>("lps:proyecto") ?? "");
   const [pestana, setPestana] = useState<Pestana>(() => {
@@ -126,7 +127,11 @@ function Principal({ nube }: { nube: Nube | null }) {
               <select aria-label="Proyecto" value={p.id} onChange={(e) => setProyectoId(e.target.value)}>{db.proyectos.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
             ) : <span className="contexto-proy">{p.nombre}</span>}
           </div>
-          {nube && nube.pendientes > 0 && <span className="pend" title="Se envían en cuanto haya conexión"><Icono n="nube" tam={14} /> {nube.pendientes} sin enviar</span>}
+          {nube && (nube.pendientes > 0 || !enLinea) && (
+            <span className="pend" role="status" title="Todo se guarda en el teléfono y se envía en cuanto haya conexión">
+              <Icono n="nube" tam={14} /> {nube.pendientes > 0 ? `${nube.pendientes} sin enviar` : "Sin señal"}
+            </span>
+          )}
           <div className="semana">
             <button type="button" aria-label="Semana anterior" onClick={() => irSemana(-1)}><Icono n="izq" tam={18} /></button>
             <span className="num">S{semanaIso(lunes).semana}</span>
@@ -136,6 +141,7 @@ function Principal({ nube }: { nube: Nube | null }) {
       </header>
 
       <main className="contenido">
+        <Avisos />
         <div className="titular">
           <h1>{titulo}</h1>
           <span className="subtitulo num">{pestana === "cap" ? `${corta(dia)} · Semana ${semanaIso(lunes).semana}` : `Semana ${semanaIso(lunes).semana} · ${corta(lunes)} – ${corta(sumarDias(lunes, 5))}`}</span>
@@ -176,9 +182,9 @@ function Principal({ nube }: { nube: Nube | null }) {
         </section>
       </main>
 
-      <nav className="tabbar" role="tablist">
+      <nav className="tabbar" role="tablist" aria-label="Secciones">
         {PESTANAS.map(([k, t, ic]) => (
-          <button type="button" role="tab" key={k} aria-selected={pestana === k} onClick={() => { setPestana(k); window.scrollTo(0, 0); }}>
+          <button type="button" role="tab" key={k} aria-selected={pestana === k} onClick={() => { if (pestana === k) window.scrollTo({ top: 0, behavior: "smooth" }); else { setPestana(k); window.scrollTo(0, 0); } }}>
             <Icono n={ic} tam={25} />
             <span>{t}</span>
           </button>
