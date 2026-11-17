@@ -13,6 +13,7 @@ export interface Proyecto {
   zonas: string[];
   causas: Causa[];
   creado: number;
+  empresaId?: string; // solo en modo nube
 }
 
 /** Actividades planeadas por contratista en un día. */
