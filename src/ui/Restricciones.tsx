@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { EstadoRestriccion, Proyecto, Restriccion } from "../types";
 import { actualizar, uid, useDatos } from "../data/store";
 import { corta, diasEntre, hoy, sumarDias } from "../lib/fechas";
+import { leerCsv } from "../lib/csv";
+import { restriccionesDesdeCsv } from "../lib/restriccionesCsv";
 import { BotonConfirmar, Hoja, Icono, toast, Vacio } from "./comun";
 
 const ESTADOS: EstadoRestriccion[] = ["Abierta", "En proceso", "Liberada"];
@@ -46,6 +48,16 @@ export function Restricciones({ p, lunes, prefill, onPrefillUsado }: { p: Proyec
     toast(r.id ? "Restricción actualizada" : "Restricción guardada");
   };
 
+  const importar = async (f: File | undefined) => {
+    if (!f) return;
+    const r = restriccionesDesdeCsv(leerCsv(await f.text()), p, db.restricciones, hoyS, uid);
+    if (!r.restricciones.length) return toast("El archivo no tiene una columna «asunto» (o «tema»). Revisa el formato.");
+    const ids = new Set(r.restricciones.map((x) => x.id));
+    actualizar((d) => { d.restricciones = [...d.restricciones.filter((x) => !ids.has(x.id)), ...r.restricciones]; });
+    setFiltro("todas");
+    toast([`${r.nuevas} nuevas`, r.actualizadas && `${r.actualizadas} actualizadas`, r.omitidas && `${r.omitidas} filas sin asunto`].filter(Boolean).join(" · "));
+  };
+
   const lista = todas.filter(F[filtro]);
   const responsables = [...new Set(todas.map((r) => r.responsable).filter(Boolean))];
 
@@ -79,6 +91,9 @@ export function Restricciones({ p, lunes, prefill, onPrefillUsado }: { p: Proyec
         ))}
       </div>
       <button type="button" className="addinc" onClick={() => setEdit(nueva())}><Icono n="mas" tam={18} /> Nueva restricción</button>
+      <div className="actions">
+        <label className="btn ghost grow">Importar restricciones (CSV)<input type="file" accept=".csv,text/csv" hidden onChange={(e) => { importar(e.target.files?.[0]); e.target.value = ""; }} /></label>
+      </div>
       {lista.length ? lista.map((r) => {
         const [t, c] = pill(r);
         return (
