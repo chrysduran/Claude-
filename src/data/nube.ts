@@ -1,7 +1,7 @@
 import { createClient, type RealtimeChannel, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import type { BaseDatos } from "../types";
 import { aplicarRemoto, borrarFotosDeNube, CLAVE_LOCAL, estadoActual, leerClave, soloLectura, usarAlmacen, usarFotosRemotas, vacia } from "./store";
-import { COLECCIONES, coleccionDe, compactar, deFila, diferencias, esErrorDefinitivo, primerLote, TABLAS, type Operacion } from "./sync";
+import { COLECCIONES, coleccionDe, compactar, deFila, diferencias, esErrorDefinitivo, primerLote, TABLAS, usarColumnaFuentes, type Operacion } from "./sync";
 
 /**
  * Modo nube con Supabase. Se activa si la app se publica con las variables
@@ -137,7 +137,10 @@ async function todas(tabla: string, filtro: (q: any) => any): Promise<Record<str
 
 export async function cargarEmpresa(empresaId: string): Promise<BaseDatos> {
   const db = vacia();
-  db.proyectos = (await todas("proyectos", (q) => q.eq("empresa_id", empresaId))).map((f) => deFila(f));
+  const filas = await todas("proyectos", (q) => q.eq("empresa_id", empresaId));
+  // Sin proyectos no se puede saber si la base ya tiene la columna `fuentes`: se asume que no (lo seguro).
+  usarColumnaFuentes(filas.some((f) => "fuentes" in f));
+  db.proyectos = filas.map((f) => deFila(f));
   const ids = db.proyectos.map((p) => p.id);
   if (!ids.length) return db;
   for (const c of COLECCIONES.filter((c) => c !== "proyectos")) {

@@ -13,6 +13,7 @@ import { Restricciones } from "./ui/Restricciones";
 import { Semana } from "./ui/Semana";
 import { Analisis } from "./ui/Analisis";
 import { Ajustes } from "./ui/Ajustes";
+import { describir, INTERVALO, sincronizarFuentes } from "./data/vinculos";
 
 const PESTANAS = [
   ["cap", "Hoy", "hoy"],
@@ -80,6 +81,16 @@ function Principal({ nube }: { nube: Nube | null }) {
   useEffect(() => { recordar("lps:pestana", pestana); }, [pestana]);
 
   const p = db.proyectos.find((x) => x.id === proyectoId) ?? db.proyectos[0] ?? null;
+
+  // Fuentes vinculadas: se releen al abrir el proyecto y cada 15 min mientras la app está abierta.
+  const puedeEscribir = !nube || nube.m.rol !== "lectura";
+  useEffect(() => {
+    if (!p || !puedeEscribir) return;
+    const leer = () => void sincronizarFuentes(p.id).then((r) => { const t = r && describir(r); if (t) toast(t); });
+    leer();
+    const t = setInterval(leer, INTERVALO);
+    return () => clearInterval(t);
+  }, [p?.id, puedeEscribir]);
 
   if (!p && !admin) {
     return (

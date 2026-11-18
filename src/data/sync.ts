@@ -20,6 +20,13 @@ const LARGOS = new Set(["notas", "detalle", "observaciones"]);
 /** La nube limita el tamaño de los textos; aquí se recortan para que una fila nunca sea rechazada por eso. */
 const recortar = (k: string, v: unknown) => (typeof v === "string" && k !== "id" ? v.slice(0, LARGOS.has(k) ? 4000 : k === "nombre" ? 200 : 500) : v);
 
+/**
+ * La columna `fuentes` de proyectos llegó después (supabase/migraciones/2026-11-18_fuentes.sql).
+ * Mientras una base no la tenga, no se manda, para que la nube no rechace el proyecto completo.
+ */
+let columnaFuentes = true;
+export const usarColumnaFuentes = (v: boolean) => { columnaFuentes = v; };
+
 export function aFila(obj: object): Record<string, unknown> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined).map(([k, v]) => [aSnake(k), recortar(k, v)]));
 }
@@ -47,7 +54,11 @@ export function diferencias(antes: BaseDatos, despues: BaseDatos): Operacion[] {
     const d = new Map((despues[c] as { id: string }[]).map((x) => [x.id, x]));
     for (const [id, x] of d) {
       const previo = a.get(id);
-      if (!previo || JSON.stringify(previo) !== JSON.stringify(x)) ops.push({ tabla: TABLAS[c], tipo: "upsert", id, fila: aFila(x) });
+      if (!previo || JSON.stringify(previo) !== JSON.stringify(x)) {
+        const fila = aFila(x);
+        if (c === "proyectos" && !columnaFuentes) delete fila.fuentes;
+        ops.push({ tabla: TABLAS[c], tipo: "upsert", id, fila });
+      }
     }
     for (const id of a.keys()) if (!d.has(id)) borrar.push({ tabla: TABLAS[c], tipo: "delete", id });
   }

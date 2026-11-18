@@ -33,6 +33,9 @@ export function sanear(x: unknown): BaseDatos | null {
     zonas: textos(p.zonas),
     causas: Array.isArray(p.causas) ? p.causas.filter((c: unknown) => c && typeof (c as { codigo?: unknown }).codigo === "string" && typeof (c as { descripcion?: unknown }).descripcion === "string") : [],
     creado: Number(p.creado) || 0,
+    fuentes: p.fuentes && typeof p.fuentes === "object"
+      ? Object.fromEntries(Object.entries(p.fuentes as Record<string, unknown>).filter(([k, v]) => ["restricciones", "plan", "catalogos"].includes(k) && typeof v === "string" && v))
+      : undefined,
   }));
   const ids = new Set(db.proyectos.map((p) => p.id));
   for (const c of COLECCIONES_HIJAS) {

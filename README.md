@@ -37,6 +37,19 @@ Primera fila con encabezados. Se reconocen estas columnas, sin importar mayúscu
 | especialidad | contratista, disciplina | No |
 | retrasada | (sí/x/1) | No |
 
+## Fuentes vinculadas (actualización automática)
+En **Ajustes › Fuentes vinculadas** cada proyecto puede apuntar a hojas publicadas como CSV (Google Sheets › Archivo › Compartir › Publicar en la web › pestaña › CSV). La app las relee al abrir el proyecto y cada 15 minutos, y también con «Actualizar ahora».
+
+| Fuente | Qué hace |
+|---|---|
+| Restricciones | Agrega o actualiza por número (sirve la hoja del registro ICE tal cual, con títulos arriba). Las filas ya cerradas solo cierran restricciones que la app ya tenía. |
+| Planeación | Carga actividades por semana (columna Semana con la fecha del lunes). Conserva lo decidido en la junta y quita lo que salió de la hoja si no se había decidido. |
+| Catálogos | Reemplaza contratistas, zonas y causas con lo que traiga cada columna. |
+
+La hoja manda: un cambio hecho en la app a una fila vinculada se sobrescribe en la siguiente lectura. Los ids son estables, así que varios teléfonos pueden leer al mismo tiempo sin duplicar. Una hoja publicada la puede leer cualquiera que tenga el enlace.
+
+Bases de Supabase creadas antes del 18 nov 2026: aplicar [`supabase/migraciones/2026-11-18_fuentes.sql`](supabase/migraciones/2026-11-18_fuentes.sql) para que las direcciones se compartan con todo el equipo.
+
 ## Publicar
 Cualquier hosting de sitios estáticos sirve. En Vercel: importar el repositorio, framework **Vite**, comando `npm run build`, carpeta `dist`.
 

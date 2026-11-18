@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aFila, compactar, deFila, diferencias, esErrorDefinitivo, primerLote, type Operacion } from "./sync";
+import { aFila, compactar, deFila, diferencias, esErrorDefinitivo, primerLote, usarColumnaFuentes, type Operacion } from "./sync";
 import type { BaseDatos } from "../types";
 
 const base = (): BaseDatos => ({ version: 1, proyectos: [], conteos: [], incumplimientos: [], restricciones: [], plan: [], narracion: [] });
@@ -67,5 +67,17 @@ describe("envío por lotes", () => {
     expect((f.id as string).length).toBe(300);
     expect((f.notas as string).length).toBe(4000);
     expect((f.actividad as string).length).toBe(500);
+  });
+});
+
+describe("columna fuentes", () => {
+  it("no la manda si la base todavía no la tiene", () => {
+    const a = base();
+    const b = base();
+    b.proyectos.push({ ...proyecto, fuentes: { restricciones: "https://docs.google.com/x" } });
+    usarColumnaFuentes(false);
+    expect(diferencias(a, b)[0].fila).not.toHaveProperty("fuentes");
+    usarColumnaFuentes(true);
+    expect(diferencias(a, b)[0].fila).toHaveProperty("fuentes");
   });
 });
