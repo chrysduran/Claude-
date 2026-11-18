@@ -5,6 +5,13 @@ export interface Causa {
   descripcion: string;
 }
 
+/** Hojas publicadas como CSV de las que el proyecto se actualiza solo (ver lib/fuentes.ts). */
+export interface Fuentes {
+  restricciones?: string;
+  plan?: string;
+  catalogos?: string;
+}
+
 export interface Proyecto {
   id: string;
   nombre: string;
@@ -14,6 +21,7 @@ export interface Proyecto {
   causas: Causa[];
   creado: number;
   empresaId?: string; // solo en modo nube
+  fuentes?: Fuentes;
 }
 
 /** Actividades planeadas por contratista en un día. */

@@ -6,6 +6,49 @@ import { hoy } from "../lib/fechas";
 import { BotonConfirmar, toast } from "./comun";
 import { Equipo } from "./Equipo";
 import type { Nube } from "../App";
+import { describir, fuentesDe, guardarFuentes, sincronizarFuentes, ultimaLectura } from "../data/vinculos";
+import { urlValida } from "../lib/fuentes";
+import type { Fuentes } from "../types";
+
+const CAMPOS: [keyof Fuentes, string, string][] = [
+  ["restricciones", "Restricciones", "Columnas: No., Tema o Asunto, Responsable, Fecha compromiso, Estado… (sirve la hoja del ICE tal cual)"],
+  ["plan", "Planeación", "Columnas: Semana (fecha del lunes), Zona o Nivel, Actividad, Contratista"],
+  ["catalogos", "Catálogos", "Columnas: Contratistas, Zonas, Causas (CÓDIGO - descripción)"],
+];
+
+function FuentesVinculadas({ p }: { p: Proyecto }) {
+  const [f, setF] = useState<Fuentes>(() => fuentesDe(p));
+  const [leyendo, setLeyendo] = useState(false);
+  const [, refrescar] = useState(0);
+  const ultima = ultimaLectura(p.id);
+  const cambio = JSON.stringify(f) !== JSON.stringify(fuentesDe(p));
+  const guardarYLeer = async () => {
+    const malas = CAMPOS.filter(([k]) => f[k]?.trim() && !urlValida(f[k]!));
+    if (malas.length) return toast(`La dirección de ${malas.map(([, t]) => t.toLowerCase()).join(" y ")} debe empezar con https://`);
+    if (cambio) guardarFuentes(p, f);
+    setLeyendo(true);
+    const r = await sincronizarFuentes(p.id, true);
+    setLeyendo(false);
+    refrescar((n) => n + 1);
+    toast(r ? describir(r) || "Todo al día: no hubo cambios" : "Guardado. Agrega al menos una dirección.");
+  };
+  return (
+    <div className="panel">
+      <span className="lab">Fuentes vinculadas</span>
+      <p className="hint">La app se actualiza sola desde hojas publicadas como CSV: al abrir el proyecto y cada 15 minutos. La hoja manda: lo que cambie ahí reemplaza lo de la app. En Google Sheets: Archivo › Compartir › Publicar en la web › elige la pestaña › «Valores separados por comas (.csv)» › Publicar, y pega aquí el enlace.</p>
+      {CAMPOS.map(([k, t, ayuda]) => (
+        <label className="field" key={k}><span>{t}</span>
+          <input type="url" inputMode="url" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=…&output=csv" value={f[k] ?? ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+          <small className="hint">{ayuda}</small>
+        </label>
+      ))}
+      <p className="hint">{ultima ? `Última lectura: ${new Date(ultima).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}` : "Todavía no se ha leído."}</p>
+      <div className="actions">
+        <button type="button" className="btn grow" disabled={leyendo} onClick={guardarYLeer}>{leyendo ? "Leyendo…" : cambio ? "Guardar y actualizar" : "Actualizar ahora"}</button>
+      </div>
+    </div>
+  );
+}
 
 const lineas = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 
@@ -80,6 +123,7 @@ export function Ajustes({ p, onCambiarProyecto, nube }: { p: Proyecto | null; on
           }}>Borrar este proyecto y sus datos</BotonConfirmar>
         </div>
       )}
+      {admin && p && <FuentesVinculadas key={p.id} p={p} />}
       {admin && <div className="panel">
         <span className="lab">Proyectos</span>
         <label className="field"><span>Nuevo proyecto</span>

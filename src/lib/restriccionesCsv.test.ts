@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Proyecto, Restriccion } from "../types";
 import { leerCsv } from "./csv";
-import { leerEstado, leerFecha, leerNumero, restriccionesDesdeCsv } from "./restriccionesCsv";
+import { leerEstado, leerFecha, leerNumero, ordenDeFechas, restriccionesDesdeCsv } from "./restriccionesCsv";
 
 const p: Proyecto = { id: "p1", nombre: "ETAGE", meta: 85, contratistas: ["Ciya", "COPACHISA"], zonas: ["Shell", "Oficinas"], causas: [], creado: 0 };
 let n = 0;
@@ -16,6 +16,15 @@ describe("lectura de campos", () => {
     expect(leerFecha("2026-11-18 00:00:00")).toBe("2026-11-18");
     expect(leerFecha("3/11/2026")).toBe("2026-11-03");
     expect(leerFecha("pronto")).toBe("");
+    expect(leerFecha("4/7/2026")).toBe("2026-07-04");
+    expect(leerFecha("4/7/2026", "mdy")).toBe("2026-04-07");
+    expect(leerFecha("7/15/2026")).toBe("2026-07-15"); // 15 no puede ser mes
+    expect(leerFecha("2026-13-01")).toBe("");
+    expect(ordenDeFechas([{ a: "4/7/2026" }, { a: "7/15/2026" }])).toBe("mdy");
+    expect(ordenDeFechas([{ a: "4/7/2026" }, { a: "15/7/2026" }])).toBe("dmy");
+    expect(leerFecha("7/15/2026")).toBe("2026-07-15"); // hoja en inglés
+    expect(leerFecha("15/7/2026 10:30:00")).toBe("2026-07-15");
+    expect(leerFecha("2026-13-01")).toBe("");
     expect(leerEstado("En proceso")).toBe("En proceso");
     expect(leerEstado("Terminado")).toBe("Liberada");
     expect(leerEstado("Restricción")).toBe("Abierta");
@@ -54,6 +63,20 @@ describe("restriccionesDesdeCsv", () => {
     const r2 = restriccionesDesdeCsv(archivo, p, r1.restricciones, "2026-11-18", nuevoId);
     expect(r2.nuevas).toBe(0);
     expect(r2.restricciones.find((x) => x.asunto === "B")?.id).toBe(b.id);
+  });
+
+  it("detecta un archivo con fechas de EE. UU.", () => {
+    const r = restriccionesDesdeCsv(leerCsv("No.,Tema,Fecha de registro,Fecha compromiso\n1,A,4/7/2026,5/20/2026\n"), p, [], "2026-11-18", nuevoId);
+    expect(r.restricciones[0]).toMatchObject({ fechaIdentificada: "2026-04-07", fechaCompromiso: "2026-05-20" });
+  });
+
+  it("el mismo número en dos temas distintos no se pisa, ni al reimportar", () => {
+    const archivo = leerCsv("No.,Tema,Estado\nICE #447,Reunión cisterna,Abierto\nICE #447,Plafón oficinas,En proceso\n");
+    const r1 = restriccionesDesdeCsv(archivo, p, [], "2026-11-18", (c) => `id:${c}`);
+    expect(r1.restricciones.map((x) => [x.numero, x.asunto])).toEqual([[447, "Reunión cisterna"], [448, "Plafón oficinas"]]);
+    const r2 = restriccionesDesdeCsv(archivo, p, r1.restricciones, "2026-11-18", (c) => `id:${c}`);
+    expect(r2.nuevas).toBe(0);
+    expect(r2.restricciones.map((x) => x.id)).toEqual(r1.restricciones.map((x) => x.id));
   });
 
   it("una restricción liberada guarda fecha de cierre", () => {

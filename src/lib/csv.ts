@@ -23,6 +23,15 @@ export function leerCsv(texto: string): Record<string, string>[] {
   if (fila.some((c) => c.trim())) filas.push(fila);
   if (!filas.length) return [];
   const norm = (s: string) => s.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const enc = filas[0].map(norm);
-  return filas.slice(1).map((f) => Object.fromEntries(enc.map((h, i) => [h, (f[i] ?? "").trim()])));
+  // Algunas hojas traen títulos arriba de la tabla: el encabezado es la fila más llena de las primeras 10.
+  const llenas = (f: string[]) => f.filter((c) => c.trim()).length;
+  let h = 0;
+  filas.slice(0, 10).forEach((f, i) => { if (llenas(f) > llenas(filas[h])) h = i; });
+  const enc = filas[h].map(norm);
+  return filas.slice(h + 1).map((f) => {
+    const o: Record<string, string> = {};
+    // Si un encabezado se repite, gana la primera columna que tenga dato.
+    enc.forEach((k, i) => { const v = (f[i] ?? "").trim(); if (k && (!(k in o) || (!o[k] && v))) o[k] = v; });
+    return o;
+  });
 }

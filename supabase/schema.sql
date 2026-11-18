@@ -37,7 +37,8 @@ create table public.proyectos (
   contratistas jsonb not null default '[]' check (jsonb_typeof(contratistas) = 'array' and pg_column_size(contratistas) < 20000),
   zonas jsonb not null default '[]' check (jsonb_typeof(zonas) = 'array' and pg_column_size(zonas) < 20000),
   causas jsonb not null default '[]' check (jsonb_typeof(causas) = 'array' and pg_column_size(causas) < 20000),
-  creado bigint not null default 0
+  creado bigint not null default 0,
+  fuentes jsonb not null default '{}' check (jsonb_typeof(fuentes) = 'object' and pg_column_size(fuentes) < 4000)
 );
 
 create table public.conteos (
